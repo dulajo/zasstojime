@@ -11,7 +11,7 @@ Jeden řádek = jedno rozhodnutí. Detaily výpočtů jsou v [metodika.md](metod
 | # | Rozhodnutí | Proč | Zamítnuto | Stav |
 |---|---|---|---|---|
 | 1 | Real-time zdroj: Golemio `/v2/vehiclepositions` (gzip), polling 30 s | Oficiální otevřená data PID | Ve Fázi 0 porovnat s lehčím endpointem a GTFS-RT (velikost, potřebná pole) | 🔍 |
-| 2 | Kategorie linek z PID GTFS `routes.txt` (včetně PID příznaků), import denně; číselné řady jen jako záloha | Rozsahy čísel nepokrývají noční linky, náhradní dopravu ani trolejbusy | Kategorie jen podle čísla linky | 🔍 |
+| 2 | Kategorie linek z PID GTFS `routes.txt`: `route_type` + `is_regional`, `is_night`, `is_substitute_transport`; import denně | Ověřeno 2. 10. 2026: sloupce existují; regionální autobusy mají čísla 300–999, městské i 5xx a 9xx, trolejbus 275 by podle čísla vyšel jako autobus | Kategorie podle čísla linky | ✅ |
 | 3 | Spoj = `(service_date, trip_id)` | `trip_id` se opakuje ve všech dnech platnosti jízdního řádu | Samotné `trip_id` | ✅ |
 | 4 | Provozní den = datum výjezdu spoje (Europe/Prague) | Noční spoj nepřeskočí po půlnoci do dalšího dne | Datum snapshotu | ✅ |
 | 5 | Maximum zpoždění platí až po 3 platných snapshotech po sobě | Odfiltruje GPS skoky a chybné párování | Prosté maximum | ✅ |
