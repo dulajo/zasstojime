@@ -1,0 +1,59 @@
+# Rozhodnutí (ADR log)
+
+Jeden řádek = jedno rozhodnutí. Detaily výpočtů jsou v [metodika.md](metodika.md), technické detaily v [technicke.md](technicke.md).
+
+**Pravidla:** řádky se nemažou. Změna rozhodnutí = nový řádek se stavem „Nahrazuje #N“ a u starého řádku se stav změní na „Nahrazeno #M“.
+
+**Stavy:** ✅ Přijato · 🔍 K ověření (Fáze 0) · 🔁 Přehodnotit později
+
+## Data a metodika
+
+| # | Rozhodnutí | Proč | Zamítnuto | Stav |
+|---|---|---|---|---|
+| 1 | Real-time zdroj: Golemio `/v2/vehiclepositions`, polling 30 s | Oficiální otevřená data PID | GTFS-RT feed (zvážit, pokud bude výrazně menší) | 🔍 |
+| 2 | Kategorie linek z PID GTFS `routes.txt`, import denně | Rozsahy čísel nepokrývají noční linky, náhradní dopravu ani trolejbusy | Kategorie podle čísla linky | 🔍 |
+| 3 | Spoj = `(service_date, trip_id)` | `trip_id` se opakuje každý den | Samotné `trip_id` | ✅ |
+| 4 | Provozní den = datum výjezdu spoje (Europe/Prague) | Noční spoj nepřeskočí po půlnoci do dalšího dne | Datum snapshotu | ✅ |
+| 5 | Maximum zpoždění platí až po 3 platných snapshotech po sobě | Odfiltruje GPS skoky a chybné párování | Prosté maximum | ✅ |
+| 6 | Index dochvilnosti z `final_delay` dokončených spojů | Odpovídá příjezdu na konečnou, je stabilní | Z maxima (moc přísné), z aktuálního stavu (kolísá) | ✅ |
+| 7 | „Včas“ = zpoždění < 180 s | Tolerance PID | — | ✅ |
+| 8 | Jízda napřed = včas, eviduje se zvlášť | Jednoduchost pro MVP | Penalizovat jako zpoždění | 🔁 |
+| 9 | Zrušené spoje mimo index, zobrazit zvlášť | Nemají zpoždění, ale jsou podstatné | Započítat jako zpožděné | ✅ |
+| 10 | Rekordman jen bez příznaku `suspect` (> 2 h) | Jedna chybná hodnota = veřejná ostuda | — | 🔍 |
+| 11 | Žebříčky linek jen s ≥ 20 dokončenými spoji | Linka se dvěma spoji by vyhrála náhodou | Bez limitu | ✅ |
+| 12 | Na webu „součet zpoždění spojů“, ne „čas cestujících“ | Obsazenost vozidel neznáme | — | ✅ |
+| 13 | Metro zobrazit jen pokud je ve feedu | Bez dat žádné „obvykle 99 %“ | Natvrdo zadané číslo | 🔍 |
+
+## Architektura
+
+| # | Rozhodnutí | Proč | Zamítnuto | Stav |
+|---|---|---|---|---|
+| 14 | Server = jedna aplikace (worker + API), uvnitř oddělené moduly | Méně věcí k provozu | Oddělené služby | ✅ |
+| 15 | Hlavní tabulka `trips_daily` (1 řádek = spoj × den) | Raw snapshoty = miliony zbytečných řádků denně | Ukládat každý snapshot | ✅ |
+| 16 | Čistý PostgreSQL 16 | Data jsou malá, cache řeší CDN | TimescaleDB, Redis | ✅ |
+| 17 | API vrací předpočítané odpovědi, CDN cache 30 s | Návštěvnost nezatíží homelab | Výpočet při každém požadavku | ✅ |
+| 18 | Surové payloady gzip, retence 7 dní | Ladění, přepočet po opravě chyby | Neukládat | 🔍 |
+
+## Technologie
+
+| # | Rozhodnutí | Proč | Zamítnuto | Stav |
+|---|---|---|---|---|
+| 19 | Server: Kotlin + **Quarkus** | Naučit se ho; Dev Services, dev mode | Micronaut (známý), Spring Boot | ✅ |
+| 20 | Přístup k DB: **jOOQ** | Agregace jsou SQL, typově bezpečně | Hibernate/Panache, Exposed | ✅ |
+| 21 | Migrace: **Flyway** | Naučit se ho; prosté verzované SQL | Liquibase (známý) | ✅ |
+| 22 | Testy proti skutečnému Postgresu (Dev Services / Testcontainers) | Mocky by nechytily chyby v SQL | H2, mocky | ✅ |
+| 23 | Klient: Next.js + TypeScript (strict) + Tailwind + TanStack Query | Současný standard, SSR, OG obrázky | Kotlin/JS, Compose for Web | ✅ |
+| 24 | TS typy generované z OpenAPI serveru | Změna API rozbije build frontendu | Ručně psané typy | ✅ |
+
+## Provoz
+
+| # | Rozhodnutí | Proč | Zamítnuto | Stav |
+|---|---|---|---|---|
+| 25 | Server v homelabu: izolovaná VM/LXC + VLAN, Docker Compose | Vlastní HW; přenositelné na VPS | VPS | ✅ |
+| 26 | Veřejně jen přes Cloudflare Tunnel; NPM + WireGuard zůstávají pro správu | Žádný otevřený port, skrytá IP, CDN | NPM veřejně, port forwarding | ✅ |
+| 27 | Frontend hostovaný na Cloudflare | Zdarma i komerčně; virální provoz mimo homelab | Vercel (free tarif zakazuje komerci) | ✅ |
+| 28 | Nová `.cz` doména u českého registrátora, DNS na Cloudflare | Cloudflare `.cz` neprodává; tunel vyžaduje DNS na Cloudflare | Subdoména `dulove.cz` (jen pro vývoj) | ✅ |
+| 29 | Návštěvnost: Cloudflare Web Analytics | Bez cookies, bez zátěže homelabu | Umami, Grafana | ✅ |
+| 30 | Monitoring: Micrometer → Prometheus → Grafana (jen přes VPN) | Už v homelabu je | — | ✅ |
+| 31 | Zálohy: denní `pg_dump` mimo homelab | Výpadek disku doma | — | ✅ |
+| 32 | Uvádět zdroj (Golemio, CC BY 4.0), žádná loga PID/DPP | Licence; nevzbuzovat dojem oficiálního webu | — | ✅ |

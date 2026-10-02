@@ -1,0 +1,177 @@
+# Technické detaily
+
+## Architektura
+
+```
+[ Golemio API ]          [ PID GTFS (denně) ]
+       │ polling 30 s             │
+       ▼                          ▼
+[ Server (Quarkus) ] ─────▶ [ PostgreSQL ]
+  ingest  – validace, stavový automat spoje, finalizace
+  gtfs    – import číselníku linek
+  aggregation – přepočet agregátů po každém cyklu
+  api     – předpočítané JSON odpovědi
+       │
+       ▼
+  Cloudflare Tunnel ─▶ Cloudflare CDN ─▶ frontend (Next.js na Cloudflare)
+```
+
+Stav běžících spojů drží server v paměti a po každém cyklu ho ukládá (UPSERT) do `trips_daily`. Po restartu ho načte z DB.
+
+## Server – knihovny
+
+| Účel | Quarkus extension / knihovna |
+|---|---|
+| Kotlin | `quarkus-kotlin` |
+| REST API | `quarkus-rest` + `quarkus-rest-kotlin-serialization` |
+| Volání Golemia | `quarkus-rest-client` |
+| Polling | `quarkus-scheduler` |
+| DB | `quarkus-jdbc-postgresql` + jOOQ |
+| Migrace | `quarkus-flyway` |
+| OpenAPI | `quarkus-smallrye-openapi` |
+| Metriky | `quarkus-micrometer-registry-prometheus` |
+| GTFS CSV | Apache Commons CSV |
+| Testy | JUnit 5, Dev Services (Postgres v Dockeru) |
+| Build | Gradle (Kotlin DSL), Java 21 |
+
+## Datový model
+
+Výchozí návrh. Po založení projektu se přesune do Flyway migrace `V1__init.sql`.
+
+| Tabulka | 1 řádek = | Retence |
+|---|---|---|
+| `routes` | linka z PID GTFS | přepis denně |
+| `trips_daily` | spoj × provozní den | 90 dní |
+| `hourly_stats` | den × hodina × kategorie | trvale |
+| `daily_route_stats` | den × linka | trvale |
+| `daily_network_stats` | den × kategorie (`all` = celá síť) | trvale |
+| `ingest_runs` | jeden běh sběru | 30 dní |
+
+```sql
+CREATE TABLE routes (
+    route_id      VARCHAR(32) PRIMARY KEY,
+    short_name    VARCHAR(16) NOT NULL,
+    route_type    SMALLINT    NOT NULL,
+    category      VARCHAR(16) NOT NULL,
+    is_night      BOOLEAN     NOT NULL DEFAULT false,
+    is_substitute BOOLEAN     NOT NULL DEFAULT false,
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE trips_daily (
+    service_date    DATE        NOT NULL,
+    trip_id         VARCHAR(64) NOT NULL,
+    route_id        VARCHAR(32) NOT NULL,
+    route_short     VARCHAR(16) NOT NULL,
+    category        VARCHAR(16) NOT NULL,
+    headsign        TEXT,
+    vehicle_id      VARCHAR(32),
+    trip_start_at   TIMESTAMPTZ,
+    first_seen_at   TIMESTAMPTZ NOT NULL,
+    last_seen_at    TIMESTAMPTZ NOT NULL,
+    status          VARCHAR(12) NOT NULL,   -- running | finished | canceled
+    finished_by     VARCHAR(12),            -- after_track | timeout
+    last_delay      INTEGER,
+    prev_delay_1    INTEGER,
+    prev_delay_2    INTEGER,
+    max_delay       INTEGER,
+    max_delay_at    TIMESTAMPTZ,
+    final_delay     INTEGER,
+    valid_snapshots INTEGER     NOT NULL DEFAULT 0,
+    suspect         BOOLEAN     NOT NULL DEFAULT false,
+    PRIMARY KEY (service_date, trip_id)
+);
+CREATE INDEX idx_trips_route   ON trips_daily (service_date, route_id);
+CREATE INDEX idx_trips_running ON trips_daily (status) WHERE status = 'running';
+
+CREATE TABLE hourly_stats (
+    service_date    DATE        NOT NULL,
+    hour            SMALLINT    NOT NULL,   -- 0–23, Europe/Prague
+    category        VARCHAR(16) NOT NULL,
+    samples         INTEGER     NOT NULL,   -- vozidlo × cyklus
+    delayed_samples INTEGER     NOT NULL,   -- z toho delay ≥ 180
+    sum_delay       BIGINT      NOT NULL,
+    PRIMARY KEY (service_date, hour, category)
+);
+
+CREATE TABLE daily_route_stats (
+    service_date   DATE        NOT NULL,
+    route_id       VARCHAR(32) NOT NULL,
+    trips_total    INTEGER     NOT NULL,
+    trips_finished INTEGER     NOT NULL,
+    trips_on_time  INTEGER     NOT NULL,
+    trips_canceled INTEGER     NOT NULL,
+    sum_max_delay  BIGINT      NOT NULL,
+    max_delay      INTEGER     NOT NULL,
+    PRIMARY KEY (service_date, route_id)
+);
+
+CREATE TABLE daily_network_stats (
+    service_date      DATE        NOT NULL,
+    category          VARCHAR(16) NOT NULL,
+    trips_total       INTEGER     NOT NULL,
+    trips_finished    INTEGER     NOT NULL,
+    trips_on_time     INTEGER     NOT NULL,
+    trips_canceled    INTEGER     NOT NULL,
+    trips_early       INTEGER     NOT NULL,
+    sum_max_delay     BIGINT      NOT NULL,
+    avg_delayed_delay INTEGER,
+    PRIMARY KEY (service_date, category)
+);
+
+CREATE TABLE ingest_runs (
+    id              BIGSERIAL   PRIMARY KEY,
+    started_at      TIMESTAMPTZ NOT NULL,
+    finished_at     TIMESTAMPTZ,
+    ok              BOOLEAN     NOT NULL,
+    vehicles        INTEGER,
+    valid_snapshots INTEGER,
+    error           TEXT
+);
+```
+
+## API
+
+Všechny odpovědi obsahují `generated_at` a `data_as_of`. Cache: `public, s-maxage=30, stale-while-revalidate=60`.
+
+| Endpoint | Obsah |
+|---|---|
+| `GET /api/day/{date\|today}` | Metriky sítě + rozpad podle kategorií |
+| `GET /api/day/{date}/leaderboard` | Žebříčky |
+| `GET /api/day/{date}/record` | Rekordman dne |
+| `GET /api/day/{date}/hourly` | Hodinový vývoj |
+| `GET /api/health` | Poslední úspěšný běh, stáří dat; 503 při datech starších než 10 min |
+
+## Konfigurace (proměnné prostředí)
+
+| Proměnná | Výchozí | Význam |
+|---|---|---|
+| `GOLEMIO_API_KEY` | — | API klíč, **nikdy necommitovat** |
+| `DATABASE_URL` | — | Připojení k PostgreSQL |
+| `POLL_INTERVAL_S` | 30 | Interval sběru |
+| `TRIP_TIMEOUT_S` | 900 | Ukončení spoje bez snapshotu |
+| `SUSPECT_DELAY_S` | 7200 | Hranice podezřelého zpoždění |
+| `MIN_TRIPS` | 20 | Minimum spojů pro žebříčky |
+
+## Kvalita a provoz
+
+| Oblast | Pravidlo |
+|---|---|
+| Alert | Poslední úspěšný běh starší než 5 min |
+| Díry v datech | Výpadek > 30 min za den → v API `incomplete: true` |
+| Jednotkové testy | Stavový automat, potvrzené maximum, finalizace, půlnoc, změna času |
+| Integrační testy | Nahrané payloady z Fáze 0 → deterministické agregáty |
+| Zálohy | Denní `pg_dump` mimo homelab |
+
+## Nasazení
+
+```
+Internet ─▶ Cloudflare (DNS, CDN) ─┬─▶ frontend (Cloudflare)
+                                   └─▶ Cloudflare Tunnel
+                                            │ odchozí spojení, žádný otevřený port
+                                            ▼
+                     homelab: izolovaná VM/LXC (vlastní VLAN)
+                     Docker Compose: cloudflared + server + PostgreSQL
+                                            │
+                     správa jen přes WireGuard + NPM: Grafana, Prometheus, DB
+```
