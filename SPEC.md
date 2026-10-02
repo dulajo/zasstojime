@@ -1,6 +1,6 @@
 # Trčíme.cz / Zpožděno – technická specifikace
 
-> Verze 0.2 (po review). Tahle verze se soustředí na **datový pohon** (sběr, výpočty, API).
+> Verze 0.3. Tahle verze se soustředí na **datový pohon** (sběr, výpočty, API).
 > Frontend a další rozšíření jsou zatím jen v roadmapě.
 
 Veřejný dashboard dochvilnosti Pražské integrované dopravy (PID) nad otevřenými daty Golemio.
@@ -282,7 +282,67 @@ Každá odpověď obsahuje `generated_at` a `data_as_of`, aby frontend mohl uká
 
 ---
 
-## 7. Roadmapa
+## 7. Technologie a provoz
+
+### 7.1 Server (worker + API v jedné aplikaci)
+| Oblast | Volba |
+|---|---|
+| Jazyk / runtime | Kotlin, Java 21 |
+| Framework | **Micronaut 4** (KSP) |
+| Polling | `@Scheduled` + Micronaut HTTP klient |
+| JSON | Micronaut Serialization |
+| Přístup k DB | **jOOQ** (generování tříd ze schématu) |
+| Migrace | **Flyway** (`src/main/resources/db/migration/V1__init.sql`, …) |
+| GTFS import | Apache Commons CSV + `COPY` do PostgreSQL |
+| API kontrakt | Micronaut OpenAPI (generuje se při kompilaci) |
+| Metriky | Micrometer → Prometheus |
+| Testy | JUnit 5 / Kotest, **Micronaut Test Resources** (Postgres v Dockeru) |
+| Build | Gradle (Kotlin DSL) |
+
+Worker a API běží v jednom procesu. Kód se ale dělí do oddělených modulů (`ingest`, `aggregation`, `api`, `gtfs`),
+aby šly později rozdělit.
+
+### 7.2 Databáze
+PostgreSQL 16.
+
+### 7.3 Klient (web)
+| Oblast | Volba |
+|---|---|
+| Framework | **Next.js** (App Router) + **TypeScript** (strict) |
+| Styly | Tailwind CSS |
+| Data | TanStack Query (refresh každých 30 s) |
+| Typy API | generované z OpenAPI serveru (`openapi-typescript`), změna API rozbije build frontendu |
+| OG obrázky | Next.js `ImageResponse` |
+| Hosting | Cloudflare (Workers/Pages). Alternativa: Vercel, ale bezplatný tarif zakazuje komerční použití. |
+
+### 7.4 Provoz
+```
+Internet ──▶ Cloudflare (DNS, CDN, cache API 30 s)
+               │                       │
+               ▼                       ▼
+        frontend (Cloudflare)    Cloudflare Tunnel
+                                       │ (odchozí spojení z homelabu, žádný otevřený port)
+                                       ▼
+                         homelab – izolovaná VM/LXC (oddělená VLAN)
+                         Docker Compose: cloudflared, app (Micronaut), PostgreSQL
+                                       │
+                         správa jen přes WireGuard + NPM:
+                         Grafana, Prometheus, přístup k DB
+```
+- **Veřejně** je dostupné jen API (přes tunel) a frontend (na Cloudflare). Virální návštěvnost obslouží CDN
+  a homelab dostane jen pár požadavků za minutu.
+- **Správa** (Grafana, DB, logy) je dostupná jen přes VPN, tak jako zbytek homelabu.
+- **Zálohy:** denní `pg_dump` mimo homelab (cloudové úložiště).
+- **Přenositelnost:** celé nasazení je Docker Compose, takže přesun na VPS je otázka obnovení zálohy a změny tunelu.
+- **Doména:** nová `.cz` doména od českého registrátora (Cloudflare `.cz` neprodává),
+  nameservery přepnuté na Cloudflare (bezplatný tarif).
+- **Návštěvnost:** Cloudflare Web Analytics (bez cookies, bez zátěže homelabu).
+- **Technický monitoring:** Grafana dashboard (zpoždění sběru, počet vozidel za cyklus, chyby Golemia, velikost DB)
+  a alerty podle oddílu 6.
+
+---
+
+## 8. Roadmapa
 
 **Fáze 0 – Ověření dat**
 - Získat API klíč, povolit síťový přístup na `api.golemio.cz` a `data.pid.cz`.
@@ -308,10 +368,8 @@ Každá odpověď obsahuje `generated_at` a `data_as_of`, aby frontend mohl uká
 
 ---
 
-## 8. Otevřené otázky
+## 9. Otevřené otázky
 
 1. Přesná struktura payloadu, seznam `state_position` a pokrytí metra/vlaků (Fáze 0).
-2. Jazyk a stack workeru a API (návrh: TypeScript/Node, aby byl stejný jazyk jako na frontendu).
-3. Hosting (VPS vs. managed PostgreSQL + serverless API).
-4. Výsledný název a doména (Trčíme.cz / Zpožděno / zasstojime).
-5. Co ukazovat na webu po půlnoci, kdy má nový den skoro nulová čísla (např. do 4:00 včerejšek).
+2. Výsledný název a doména (Trčíme.cz / Zpožděno / zasstojime).
+3. Co ukazovat na webu po půlnoci, kdy má nový den skoro nulová čísla (např. do 4:00 včerejšek).
