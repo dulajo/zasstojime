@@ -15,19 +15,22 @@ Spoj, který je na půlce trasy o 12 minut pozadu a na konečnou dojede včas, s
 
 → 3 ze 7 odjezdů včas, největší zpoždění na trase +12 min.
 
-## Vstupní data (Golemio `vehiclepositions`) 🔍
+## Vstupní data (Golemio `/v2/vehiclepositions?includeNotTracking=true`)
 
-| Význam | Předpokládaná cesta v `features[].properties` |
+Ověřeno na reálných datech, viz [faze0.md](faze0.md).
+
+| Význam | Cesta v `features[].properties` |
 |---|---|
 | ID spoje | `trip.gtfs.trip_id` |
 | Začátek spoje | `trip.start_timestamp` |
 | Linka | `trip.gtfs.route_id`, `trip.gtfs.route_short_name` |
 | Typ dopravy | `trip.gtfs.route_type` |
 | Směr | `trip.gtfs.trip_headsign` |
-| Vozidlo | `trip.vehicle_registration_number` |
+| Vozidlo | `trip.vehicle_registration_number` (u metra a vlaků `null`) |
 | Aktuální zpoždění [s] | `last_position.delay.actual` (může být `null`) |
 | Zpoždění při odjezdu z poslední zastávky [s] | `last_position.delay.last_stop_departure` |
 | Poslední zastávka (pořadí na trase) | `last_position.last_stop.sequence` |
+| Zrušený spoj | `last_position.is_canceled` |
 | Čas polohy | `last_position.origin_timestamp` |
 | Stav vozidla | `last_position.state_position` |
 
@@ -38,7 +41,7 @@ Snapshot vstupuje do výpočtů, jen když platí **vše**:
 | Podmínka | Důvod |
 |---|---|
 | `delay.actual` ≠ `null` | Bez zpoždění nic nespočítáme |
-| `state_position` ∈ {`on_track`, `at_stop`} 🔍 | Mimo trasu nebo před jízdou je zpoždění nespolehlivé |
+| `state_position` ∈ {`on_track`, `at_stop`} | Mimo trasu nebo před jízdou je zpoždění nespolehlivé |
 | `origin_timestamp` je mladší než 5 min | Vozidlo se reálně hlásí |
 | `origin_timestamp` je novější než poslední zpracovaný | Deduplikace |
 | Nárůst zpoždění od posledního snapshotu ≤ uplynulý čas + 120 s | Zpoždění nemůže růst rychleji než čas; skok +60 min za 30 s je chyba dat |
@@ -47,7 +50,8 @@ Víc vozidel na jednom spoji (spřažené soupravy) → bere se nejnovější sn
 
 ## Měření odjezdů
 
-- Když se v platném snapshotu objeví zastávka s vyšším `sequence`, než jakou už spoj má, zaznamená se **jeden odjezd** se zpožděním `delay.last_stop_departure`.
+- Když se v platném snapshotu objeví zastávka s vyšším `sequence`, než jakou už spoj má, a `delay.last_stop_departure` není `null`, zaznamená se **jeden odjezd** s tímto zpožděním.
+- Dokud vozidlo na zastávce stojí, je `last_stop_departure` `null` (ještě neodjelo), odjezd se zaznamená až v dalším snapshotu. 🔍 ověřit na záznamu
 - Každá zastávka spoje se počítá nejvýš jednou.
 - Zastávky, které vozidlo projede mezi dvěma staženími, se nezměří (chybí, nezkreslují).
 
@@ -77,11 +81,12 @@ Klouzavé okno posledních snapshotů žije jen v paměti serveru, ne v DB.
 | Z | Událost | Do |
 |---|---|---|
 | — | první platný snapshot | `running` |
-| `running` | `state_position = after_track` | `finished` |
+| `running` | `state_position` ∈ {`after_track`, `after_track_delayed`} | `finished` |
 | `running` | 15 min bez snapshotu | `finished` (timeout) |
-| `running` | `state_position = canceled` | `canceled` |
+| libovolný | `state_position = canceled` nebo `is_canceled = true` | `canceled` |
 
-Ostatní stavy (`off_track`, `mismatched`, `before_track`, …) spoj neukončí, jen se nepoužijí pro výpočet. 🔍
+Stavy `before_track`, `before_track_delayed` a `off_track` spoj neukončí, jen se nepoužijí pro výpočet.
+Zpoždění spoje, který vyjede pozdě z výchozí zastávky, se zachytí prvním odjezdem.
 Spoj bez jediného platného snapshotu se nepočítá.
 
 ## Metriky (za provozní den)
@@ -99,7 +104,7 @@ Spoj bez jediného platného snapshotu se nepočítá.
 
 | Kategorie | Pravidlo (PID GTFS `routes.txt`) |
 |---|---|
-| `metro` | `route_type = 1` (pravděpodobně ve feedu chybí → nezobrazovat) |
+| `metro` | `route_type = 1` (ve feedu je, reálnost zpoždění 🔍) |
 | `tram` | `route_type = 0` |
 | `bus_city` | `route_type = 3`, `is_regional = 0` |
 | `bus_regional` | `route_type = 3`, `is_regional = 1` |
