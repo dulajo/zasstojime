@@ -16,7 +16,7 @@
   Cloudflare Tunnel ─▶ Cloudflare CDN ─▶ frontend (Next.js na Cloudflare)
 ```
 
-Stav dnešních spojů drží server v paměti (včetně klouzavého okna snapshotů a už změřených zastávek). Do `trips_daily` ukládá (UPSERT) jen spoje, které se v cyklu změnily. Po restartu stav načte z DB; přijde nanejvýš o rozpracované okno snapshotů.
+Stav dnešních spojů drží server v paměti (včetně rozpracované zastávky). Do `trips_daily` ukládá (UPSERT) jen spoje, které se v cyklu změnily. Po restartu stav načte z DB; přijde nanejvýš o právě rozpracovaný odjezd.
 
 ## Server – knihovny
 
@@ -74,6 +74,7 @@ CREATE TABLE trips_daily (
     last_delay      INTEGER,
     max_delay       INTEGER,
     max_delay_at    TIMESTAMPTZ,
+    max_delay_stop  VARCHAR(32),            -- GTFS stop_id
     last_stop_seq   INTEGER,                -- poslední změřená zastávka
     dep_total       INTEGER     NOT NULL DEFAULT 0,
     dep_on_time     INTEGER     NOT NULL DEFAULT 0,
@@ -167,7 +168,7 @@ Všechny odpovědi obsahují `generated_at` a `data_as_of`. Cache: `public, s-ma
 |---|---|
 | Alert | Poslední úspěšný běh starší než 5 min |
 | Díry v datech | Výpadek > 30 min za den → v API `incomplete: true` |
-| Jednotkové testy | Stavový automat, potvrzené maximum (i krátké spoje), měření odjezdů, nereálné skoky, finalizace, půlnoc, změna času |
+| Jednotkové testy | Stavový automat (včetně znovuotevření), měření odjezdů, přeskok zpět, nereálné skoky, půlnoc, změna času |
 | Integrační testy | Nahrané payloady z Fáze 0 → deterministické agregáty |
 | Zálohy | Denní `pg_dump` mimo homelab |
 

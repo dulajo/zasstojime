@@ -28,6 +28,6 @@ Zdroj dat: [Golemio](https://golemio.cz), licence CC BY 4.0. Projekt není ofici
 
 | # | Otázka |
 |---|---|
-| 1 | Jsou zpoždění metra reálná? (Fáze 0) |
+| 1 | Jsou zpoždění metra reálná? (Fáze 0, #13) |
 | 2 | Výsledný název a doména |
 | 3 | Co ukazovat po půlnoci, kdy má nový den skoro nulová čísla |
