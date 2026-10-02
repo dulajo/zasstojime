@@ -97,17 +97,16 @@ Spoj bez jediného platného snapshotu se nepočítá.
 
 ## Kategorie (semafor)
 
-| Kategorie | Pravidlo (PID GTFS `routes.txt`) 🔍 |
+| Kategorie | Pravidlo (PID GTFS `routes.txt`) |
 |---|---|
 | `metro` | `route_type = 1` (pravděpodobně ve feedu chybí → nezobrazovat) |
 | `tram` | `route_type = 0` |
-| `bus_city` | `route_type = 3`, ne regionální |
-| `bus_regional` | `route_type = 3`, regionální |
+| `bus_city` | `route_type = 3`, `is_regional = 0` |
+| `bus_regional` | `route_type = 3`, `is_regional = 1` |
 | `train` | `route_type = 2` |
 | `other` | Trolejbus (11), přívoz (4), lanovka (7) |
 
-Regionální = PID příznak v `routes.txt`. Pokud chybí, záloha podle číselných řad linek.
-Noční linka a náhradní doprava jsou příznaky, ne kategorie.
+Noční linka (`is_night`) a náhradní doprava (`is_substitute_transport`) jsou příznaky, ne kategorie.
 
 ## Žebříčky
 
