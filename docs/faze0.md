@@ -58,8 +58,33 @@ Celkem 15,6 % vozidel ≥ 180 s, 1,3 % jede napřed (≤ −60 s).
 | Bus 406 → Vlašim | `actual` 1 732 s, `last_stop_departure` 7 s | Totéž; ověřit na záznamu, jestli jde o skok |
 | Metro | Zpoždění max. 23 s | Možná dopočet z jízdního řádu (#13) |
 
-## Ještě ověřit na 2h záznamu
+## 2h záznam (2. 10. 2026, 20:17–22:15, snímek à 30 s)
 
-- Měření odjezdů: přechod `at_stop` → `on_track` a vyplnění `last_stop_departure`.
-- Přechody do `after_track` a zrušení.
-- Četnost a podoba skoků v `actual` (kalibrace pravidla #35).
+228 snímků, 5 235 spojů, 47 MB gzip.
+
+| Otázka | Zjištění | Dopad |
+|---|---|---|
+| Funguje měření odjezdů? | 46 430 odjezdů; nezachyceno 1,3 % zastávek (projeté mezi snímky) | ✅ #33 |
+| Ustálí se hodnota odjezdu? | Na zastávce se mění (9 122 zastávek), po odjezdu stabilní (výjimek 220) | Brát poslední hodnotu před posunem (#41) |
+| Jak spoje končí? | Z 3 609 jedoucích: 2 499 → `after_track`, 474 zmizelo bez něj (13 %) | Timeout nutný |
+| Je `after_track` definitivní? | 41 spojů se pak vrátilo na trasu | Znovuotevření (#42) |
+| Zrušené spoje | 6, z toho 1 zrušen až za jízdy | — |
+| Skoky v `actual` | Ze 137 tis. dvojic snímků: 99,9 % roste ≤ 60 s nad uplynulý čas; 42 skoků > 120 s, **všechny s přeskokem zpět na trase** | Tolerance 120 s sedí; přeskok zpět = neplatný (#40) |
+| `actual` vs. odjezdy | Max z `actual` (i se 3 snapshoty) je u 19 spojů o > 10 min vyšší než max z odjezdů; falešní „rekordmani“ 78, 35 a 34 min | Vše počítat z odjezdů (#39) |
+| Metro | 7 263 vzorků, max 66 s, odjezdy 100 % včas | Stále nejasné (#13) |
+
+### Index dochvilnosti z odjezdů (večer, mimo špičku)
+
+| Typ | Odjezdů | Včas | Předjetí |
+|---|---|---|---|
+| Celkem | 46 430 | **87,4 %** | 0,3 % |
+| Tramvaj | 7 694 | 92,2 % | 0,0 % |
+| Autobus | 33 121 | 86,5 % | 0,3 % |
+| Trolejbus | 755 | 84,8 % | 0,3 % |
+| Vlak | 2 945 | 77,2 % | 1,2 % |
+| Metro | 1 901 | 100 % | 0,0 % |
+
+## Zbývá
+
+- Záznam v ranní špičce (kalibrace na horších podmínkách).
+- Metro při známé mimořádnosti (#13).
