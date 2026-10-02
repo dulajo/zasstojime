@@ -17,7 +17,7 @@ Zdroj dat: [Golemio](https://golemio.cz), licence CC BY 4.0. Projekt není ofici
 
 | Fáze | Obsah | Stav |
 |---|---|---|
-| 0 – Ověření dat | API klíč, síť, nahrát 2–3 h payloadů, ověřit body 🔍 v metodice | ⏳ |
+| 0 – Ověření dat | API klíč, nahrát 2–3 h payloadů, porovnat zdroje (GeoJSON / lehčí endpoint / GTFS-RT), ověřit body 🔍 | ⏳ (síť ✅, klíč chybí) |
 | 1 – Pohon | GTFS import, sběr, stavový automat spoje, agregace, API, monitoring, testy | — |
 | 2 – Dashboard | Web: hlavní metriky, semafor, žebříčky, rekordman, metodika, OG obrázky | — |
 | 3 – Rozšíření | Grafy během dne, detail linky, historie | — |

@@ -9,14 +9,14 @@
 [ Server (Quarkus) ] ─────▶ [ PostgreSQL ]
   ingest  – validace, stavový automat spoje, finalizace
   gtfs    – import číselníku linek
-  aggregation – přepočet agregátů po každém cyklu
+  aggregation – živá čísla v paměti; denní tabulky do DB každých 5 min
   api     – předpočítané JSON odpovědi
        │
        ▼
   Cloudflare Tunnel ─▶ Cloudflare CDN ─▶ frontend (Next.js na Cloudflare)
 ```
 
-Stav běžících spojů drží server v paměti a po každém cyklu ho ukládá (UPSERT) do `trips_daily`. Po restartu ho načte z DB.
+Stav dnešních spojů drží server v paměti (včetně klouzavého okna snapshotů a už změřených zastávek). Do `trips_daily` ukládá (UPSERT) jen spoje, které se v cyklu změnily. Po restartu stav načte z DB; přijde nanejvýš o rozpracované okno snapshotů.
 
 ## Server – knihovny
 
@@ -72,13 +72,15 @@ CREATE TABLE trips_daily (
     status          VARCHAR(12) NOT NULL,   -- running | finished | canceled
     finished_by     VARCHAR(12),            -- after_track | timeout
     last_delay      INTEGER,
-    prev_delay_1    INTEGER,
-    prev_delay_2    INTEGER,
     max_delay       INTEGER,
     max_delay_at    TIMESTAMPTZ,
-    final_delay     INTEGER,
+    last_stop_seq   INTEGER,                -- poslední změřená zastávka
+    dep_total       INTEGER     NOT NULL DEFAULT 0,
+    dep_on_time     INTEGER     NOT NULL DEFAULT 0,
+    dep_early       INTEGER     NOT NULL DEFAULT 0,
+    dep_late        INTEGER     NOT NULL DEFAULT 0,
+    dep_late_sum    BIGINT      NOT NULL DEFAULT 0,
     valid_snapshots INTEGER     NOT NULL DEFAULT 0,
-    suspect         BOOLEAN     NOT NULL DEFAULT false,
     PRIMARY KEY (service_date, trip_id)
 );
 CREATE INDEX idx_trips_route   ON trips_daily (service_date, route_id);
@@ -99,10 +101,12 @@ CREATE TABLE daily_route_stats (
     route_id       VARCHAR(32) NOT NULL,
     trips_total    INTEGER     NOT NULL,
     trips_finished INTEGER     NOT NULL,
-    trips_on_time  INTEGER     NOT NULL,
     trips_canceled INTEGER     NOT NULL,
-    sum_max_delay  BIGINT      NOT NULL,
-    max_delay      INTEGER     NOT NULL,
+    dep_total      INTEGER     NOT NULL DEFAULT 0,
+    dep_on_time    INTEGER     NOT NULL DEFAULT 0,
+    dep_early      INTEGER     NOT NULL DEFAULT 0,
+    sum_max_delay  BIGINT      NOT NULL DEFAULT 0,   -- COALESCE při výpočtu
+    max_delay      INTEGER     NOT NULL DEFAULT 0,
     PRIMARY KEY (service_date, route_id)
 );
 
@@ -111,11 +115,13 @@ CREATE TABLE daily_network_stats (
     category          VARCHAR(16) NOT NULL,
     trips_total       INTEGER     NOT NULL,
     trips_finished    INTEGER     NOT NULL,
-    trips_on_time     INTEGER     NOT NULL,
     trips_canceled    INTEGER     NOT NULL,
-    trips_early       INTEGER     NOT NULL,
-    sum_max_delay     BIGINT      NOT NULL,
-    avg_delayed_delay INTEGER,
+    dep_total         INTEGER     NOT NULL DEFAULT 0,
+    dep_on_time       INTEGER     NOT NULL DEFAULT 0,
+    dep_early         INTEGER     NOT NULL DEFAULT 0,
+    dep_late          INTEGER     NOT NULL DEFAULT 0,
+    dep_late_sum      BIGINT      NOT NULL DEFAULT 0,
+    sum_max_delay     BIGINT      NOT NULL DEFAULT 0,
     PRIMARY KEY (service_date, category)
 );
 
@@ -150,7 +156,9 @@ Všechny odpovědi obsahují `generated_at` a `data_as_of`. Cache: `public, s-ma
 | `DATABASE_URL` | — | Připojení k PostgreSQL |
 | `POLL_INTERVAL_S` | 30 | Interval sběru |
 | `TRIP_TIMEOUT_S` | 900 | Ukončení spoje bez snapshotu |
-| `SUSPECT_DELAY_S` | 7200 | Hranice podezřelého zpoždění |
+| `MAX_DELAY_JUMP_S` | 120 | Tolerance nárůstu zpoždění nad uplynulý čas |
+| `ALERT_DELAY_S` | 7200 | Zpoždění, o kterém se pošle upozornění správci |
+| `DAILY_FLUSH_S` | 300 | Interval zápisu denních tabulek do DB |
 | `MIN_TRIPS` | 20 | Minimum spojů pro žebříčky |
 
 ## Kvalita a provoz
@@ -159,7 +167,7 @@ Všechny odpovědi obsahují `generated_at` a `data_as_of`. Cache: `public, s-ma
 |---|---|
 | Alert | Poslední úspěšný běh starší než 5 min |
 | Díry v datech | Výpadek > 30 min za den → v API `incomplete: true` |
-| Jednotkové testy | Stavový automat, potvrzené maximum, finalizace, půlnoc, změna času |
+| Jednotkové testy | Stavový automat, potvrzené maximum (i krátké spoje), měření odjezdů, nereálné skoky, finalizace, půlnoc, změna času |
 | Integrační testy | Nahrané payloady z Fáze 0 → deterministické agregáty |
 | Zálohy | Denní `pg_dump` mimo homelab |
 

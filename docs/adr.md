@@ -10,19 +10,23 @@ Jeden řádek = jedno rozhodnutí. Detaily výpočtů jsou v [metodika.md](metod
 
 | # | Rozhodnutí | Proč | Zamítnuto | Stav |
 |---|---|---|---|---|
-| 1 | Real-time zdroj: Golemio `/v2/vehiclepositions`, polling 30 s | Oficiální otevřená data PID | GTFS-RT feed (zvážit, pokud bude výrazně menší) | 🔍 |
-| 2 | Kategorie linek z PID GTFS `routes.txt`, import denně | Rozsahy čísel nepokrývají noční linky, náhradní dopravu ani trolejbusy | Kategorie podle čísla linky | 🔍 |
-| 3 | Spoj = `(service_date, trip_id)` | `trip_id` se opakuje každý den | Samotné `trip_id` | ✅ |
+| 1 | Real-time zdroj: Golemio `/v2/vehiclepositions` (gzip), polling 30 s | Oficiální otevřená data PID | Ve Fázi 0 porovnat s lehčím endpointem a GTFS-RT (velikost, potřebná pole) | 🔍 |
+| 2 | Kategorie linek z PID GTFS `routes.txt` (včetně PID příznaků), import denně; číselné řady jen jako záloha | Rozsahy čísel nepokrývají noční linky, náhradní dopravu ani trolejbusy | Kategorie jen podle čísla linky | 🔍 |
+| 3 | Spoj = `(service_date, trip_id)` | `trip_id` se opakuje ve všech dnech platnosti jízdního řádu | Samotné `trip_id` | ✅ |
 | 4 | Provozní den = datum výjezdu spoje (Europe/Prague) | Noční spoj nepřeskočí po půlnoci do dalšího dne | Datum snapshotu | ✅ |
 | 5 | Maximum zpoždění platí až po 3 platných snapshotech po sobě | Odfiltruje GPS skoky a chybné párování | Prosté maximum | ✅ |
-| 6 | Index dochvilnosti z `final_delay` dokončených spojů | Odpovídá příjezdu na konečnou, je stabilní | Z maxima (moc přísné), z aktuálního stavu (kolísá) | ✅ |
+| 6 | Index dochvilnosti z `final_delay` dokončených spojů | Odpovídá příjezdu na konečnou, je stabilní | Z maxima (moc přísné), z aktuálního stavu (kolísá) | Nahrazeno #33 |
 | 7 | „Včas“ = zpoždění < 180 s | Tolerance PID | — | ✅ |
-| 8 | Jízda napřed = včas, eviduje se zvlášť | Jednoduchost pro MVP | Penalizovat jako zpoždění | 🔁 |
+| 8 | Jízda napřed = včas, eviduje se zvlášť | Jednoduchost pro MVP | Penalizovat jako zpoždění | Nahrazeno #34 |
 | 9 | Zrušené spoje mimo index, zobrazit zvlášť | Nemají zpoždění, ale jsou podstatné | Započítat jako zpožděné | ✅ |
-| 10 | Rekordman jen bez příznaku `suspect` (> 2 h) | Jedna chybná hodnota = veřejná ostuda | — | 🔍 |
+| 10 | Rekordman jen bez příznaku `suspect` (> 2 h) | Jedna chybná hodnota = veřejná ostuda | — | Nahrazeno #35 |
 | 11 | Žebříčky linek jen s ≥ 20 dokončenými spoji | Linka se dvěma spoji by vyhrála náhodou | Bez limitu | ✅ |
 | 12 | Na webu „součet zpoždění spojů“, ne „čas cestujících“ | Obsazenost vozidel neznáme | — | ✅ |
 | 13 | Metro zobrazit jen pokud je ve feedu | Bez dat žádné „obvykle 99 %“ | Natvrdo zadané číslo | 🔍 |
+| 33 | Dochvilnost se měří na každém odjezdu ze zastávky (nahrazuje #6) | Cestující, který jel jen do půlky trasy, zpoždění zažil, i když spoj na konečnou dojel včas | Zpoždění na konečné (#6); průměr snapshotů (pomalé spoje mají víc snapshotů) | 🔍 |
+| 34 | Odjezd o ≥ 60 s dřív = předjetí, počítá se jako nedochvilnost (nahrazuje #8) | Cestujícímu spoj ujel; tak to bere i PID | Předjetí = včas (#8) | ✅ |
+| 35 | Chyby dat se poznají podle nereálného skoku: nárůst zpoždění ≤ uplynulý čas + 120 s; > 2 h jen upozornění správci (nahrazuje #10) | Reálné zpoždění 140 min při kalamitě se zobrazí, chyba dat ne | Pevná hranice 2 h (#10) | ✅ |
+| 36 | Spoj s < 3 platnými snapshoty: `max_delay` = minimum z dostupných | Krátké spoje nesmí mít `NULL` | Vynechat krátké spoje | ✅ |
 
 ## Architektura
 
@@ -33,6 +37,8 @@ Jeden řádek = jedno rozhodnutí. Detaily výpočtů jsou v [metodika.md](metod
 | 16 | Čistý PostgreSQL 16 | Data jsou malá, cache řeší CDN | TimescaleDB, Redis | ✅ |
 | 17 | API vrací předpočítané odpovědi, CDN cache 30 s | Návštěvnost nezatíží homelab | Výpočet při každém požadavku | ✅ |
 | 18 | Surové payloady gzip, retence 7 dní | Ladění, přepočet po opravě chyby | Neukládat | 🔍 |
+| 37 | Klouzavé okno snapshotů jen v paměti serveru, ne v DB | Změna délky okna nevyžaduje migraci; po restartu ztratíme max. 2 snapshoty | Sloupce `prev_delay_*` v DB | ✅ |
+| 38 | Živá čísla počítá server v paměti; do DB jen změněné spoje, denní tabulky každých 5 min a na konci dne | Méně zápisů, jednodušší | Přepočet DB agregátů v každém cyklu | ✅ |
 
 ## Technologie
 
