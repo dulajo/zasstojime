@@ -10,7 +10,7 @@ Jeden řádek = jedno rozhodnutí. Detaily výpočtů jsou v [metodika.md](metod
 
 | # | Rozhodnutí | Proč | Zamítnuto | Stav |
 |---|---|---|---|---|
-| 1 | Real-time zdroj: Golemio `/v2/vehiclepositions` (gzip), polling 30 s | Oficiální otevřená data PID | Ve Fázi 0 porovnat s lehčím endpointem a GTFS-RT (velikost, potřebná pole) | 🔍 |
+| 1 | Real-time zdroj: Golemio `/v2/vehiclepositions?includeNotTracking=true` (gzip), polling 30 s | Jediný zdroj se zpožděním při odjezdu, začátkem spoje a všemi stavy (dojeté, zrušené); ~270 kB/snímek ≈ 0,8 GB/den | `/v2/public/vehiclepositions` (29 kB, ale chybí odjezdy a začátek spoje); GTFS-RT (větší, bez PID stavů) | ✅ |
 | 2 | Kategorie linek z PID GTFS `routes.txt`: `route_type` + `is_regional`, `is_night`, `is_substitute_transport`; import denně | Ověřeno 2. 10. 2026: sloupce existují; regionální autobusy mají čísla 300–999, městské i 5xx a 9xx, trolejbus 275 by podle čísla vyšel jako autobus | Kategorie podle čísla linky | ✅ |
 | 3 | Spoj = `(service_date, trip_id)` | `trip_id` se opakuje ve všech dnech platnosti jízdního řádu | Samotné `trip_id` | ✅ |
 | 4 | Provozní den = datum výjezdu spoje (Europe/Prague) | Noční spoj nepřeskočí po půlnoci do dalšího dne | Datum snapshotu | ✅ |
@@ -22,7 +22,7 @@ Jeden řádek = jedno rozhodnutí. Detaily výpočtů jsou v [metodika.md](metod
 | 10 | Rekordman jen bez příznaku `suspect` (> 2 h) | Jedna chybná hodnota = veřejná ostuda | — | Nahrazeno #35 |
 | 11 | Žebříčky linek jen s ≥ 20 dokončenými spoji | Linka se dvěma spoji by vyhrála náhodou | Bez limitu | ✅ |
 | 12 | Na webu „součet zpoždění spojů“, ne „čas cestujících“ | Obsazenost vozidel neznáme | — | ✅ |
-| 13 | Metro zobrazit jen pokud je ve feedu | Bez dat žádné „obvykle 99 %“ | Natvrdo zadané číslo | 🔍 |
+| 13 | Metro zobrazit jen pokud jsou jeho zpoždění reálná | Metro ve feedu je, ale zpoždění max. ~20 s, může jít o dopočet z jízdního řádu; ověřit při známé mimořádnosti | Natvrdo zadané číslo | 🔍 |
 | 33 | Dochvilnost se měří na každém odjezdu ze zastávky (nahrazuje #6) | Cestující, který jel jen do půlky trasy, zpoždění zažil, i když spoj na konečnou dojel včas | Zpoždění na konečné (#6); průměr snapshotů (pomalé spoje mají víc snapshotů) | 🔍 |
 | 34 | Odjezd o ≥ 60 s dřív = předjetí, počítá se jako nedochvilnost (nahrazuje #8) | Cestujícímu spoj ujel; tak to bere i PID | Předjetí = včas (#8) | ✅ |
 | 35 | Chyby dat se poznají podle nereálného skoku: nárůst zpoždění ≤ uplynulý čas + 120 s; > 2 h jen upozornění správci (nahrazuje #10) | Reálné zpoždění 140 min při kalamitě se zobrazí, chyba dat ne | Pevná hranice 2 h (#10) | ✅ |
@@ -36,7 +36,7 @@ Jeden řádek = jedno rozhodnutí. Detaily výpočtů jsou v [metodika.md](metod
 | 15 | Hlavní tabulka `trips_daily` (1 řádek = spoj × den) | Raw snapshoty = miliony zbytečných řádků denně | Ukládat každý snapshot | ✅ |
 | 16 | Čistý PostgreSQL 16 | Data jsou malá, cache řeší CDN | TimescaleDB, Redis | ✅ |
 | 17 | API vrací předpočítané odpovědi, CDN cache 30 s | Návštěvnost nezatíží homelab | Výpočet při každém požadavku | ✅ |
-| 18 | Surové payloady gzip, retence 7 dní | Ladění, přepočet po opravě chyby | Neukládat | 🔍 |
+| 18 | Surové payloady gzip, retence 7 dní | Ladění, přepočet po opravě chyby; ~0,8 GB/den, tj. ~6 GB celkem | Neukládat | ✅ |
 | 37 | Klouzavé okno snapshotů jen v paměti serveru, ne v DB | Změna délky okna nevyžaduje migraci; po restartu ztratíme max. 2 snapshoty | Sloupce `prev_delay_*` v DB | ✅ |
 | 38 | Živá čísla počítá server v paměti; do DB jen změněné spoje, denní tabulky každých 5 min a na konci dne | Méně zápisů, jednodušší | Přepočet DB agregátů v každém cyklu | ✅ |
 

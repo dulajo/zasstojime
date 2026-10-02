@@ -12,12 +12,13 @@ Zdroj dat: [Golemio](https://golemio.cz), licence CC BY 4.0. Projekt není ofici
 | [docs/adr.md](docs/adr.md) | Rozhodnutí: co, proč a co jsme zamítli |
 | [docs/metodika.md](docs/metodika.md) | Jak se počítá každé číslo |
 | [docs/technicke.md](docs/technicke.md) | Architektura, datový model, API, konfigurace, nasazení |
+| [docs/faze0.md](docs/faze0.md) | Zjištění z reálných dat |
 
 ## Roadmapa
 
 | Fáze | Obsah | Stav |
 |---|---|---|
-| 0 – Ověření dat | API klíč, nahrát 2–3 h payloadů, porovnat zdroje (GeoJSON / lehčí endpoint / GTFS-RT), ověřit body 🔍 | ⏳ (síť ✅, klíč chybí) |
+| 0 – Ověření dat | API klíč, nahrát 2–3 h payloadů, porovnat zdroje (GeoJSON / lehčí endpoint / GTFS-RT), ověřit body 🔍 | ⏳ (probíhá) |
 | 1 – Pohon | GTFS import, sběr, stavový automat spoje, agregace, API, monitoring, testy | — |
 | 2 – Dashboard | Web: hlavní metriky, semafor, žebříčky, rekordman, metodika, OG obrázky | — |
 | 3 – Rozšíření | Grafy během dne, detail linky, historie | — |
@@ -27,6 +28,6 @@ Zdroj dat: [Golemio](https://golemio.cz), licence CC BY 4.0. Projekt není ofici
 
 | # | Otázka |
 |---|---|
-| 1 | Struktura payloadu, stavy vozidel, pokrytí metra a vlaků (Fáze 0) |
+| 1 | Jsou zpoždění metra reálná? (Fáze 0) |
 | 2 | Výsledný název a doména |
 | 3 | Co ukazovat po půlnoci, kdy má nový den skoro nulová čísla |
