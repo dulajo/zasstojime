@@ -23,6 +23,8 @@ interface AppConfig {
 
     fun alertDelayS(): Int
 
+    fun dailyFlushS(): Long
+
     @WithDefault("10m")
     fun healthMaxAge(): java.time.Duration
 

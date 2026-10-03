@@ -71,6 +71,8 @@ class TripState(
     var depLateSum = 0L
     var validSnapshots = 0
     var flagged = false
+    var verified = false
+    var excluded = false
 
     /** Nejvyšší dosud platná sekvence zastávky (ADR-0040, ADR-0052). */
     var maxSeq = 0
