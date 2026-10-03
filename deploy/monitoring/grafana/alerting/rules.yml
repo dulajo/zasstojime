@@ -1,0 +1,154 @@
+# Alerty sběru (docs/technicke.md – Kvalita a provoz, ADR-0030). Postupy řešení: docs/provoz.md.
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: zasstojime
+    folder: Zasstojime
+    interval: 1m
+    rules:
+      - uid: sber-stoji
+        title: Sběr stojí
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                max(ingest_data_age_seconds >= 0) or max(process_uptime_seconds)
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [180] }
+        noDataState: Alerting
+        execErrState: Error
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'Poslední úspěšný cyklus sběru je starý {{ humanizeDuration $values.A.Value }}'
+          description: >-
+            Hodnota je stáří dat v sekundách (po startu bez úspěšného cyklu doba běhu serveru). Bez dat znamená, že Prometheus server nevidí. Postup: docs/provoz.md – Sběr stojí.
+      - uid: sber-chyby
+        title: Sběr často selhává
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                sum(increase(ingest_cycles_total{result="error"}[1h])) / sum(increase(ingest_cycles_total[1h]))
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [0.05] }
+        noDataState: OK
+        execErrState: Error
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Za poslední hodinu selhalo víc než 5 % cyklů sběru
+          description: >-
+            AC-07 vyžaduje úspěšnost aspoň 99 %. Příčinu ukáže golemio_errors_total{kind} a log serveru.
+      - uid: gtfs-import-selhal
+        title: Import jízdního řádu selhal
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                sum(increase(gtfs_import_failures_total[1h]))
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        labels:
+          severity: warning
+        annotations:
+          summary: Import GTFS za poslední hodinu selhal
+          description: >-
+            Sběr běží dál se starším jízdním řádem. Nový import proběhne v 04:30, případně restartem serveru.
+      - uid: gtfs-stary
+        title: Jízdní řád je starý
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                time() - max(gtfs_import_last_success_seconds > 0)
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [108000] }
+        noDataState: OK
+        execErrState: Error
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Poslední úspěšný import GTFS je starší než 30 h
+          description: >-
+            Nové spoje nemusí mít kategorii ani zastávky. Zkontrolujte log importu.
+      - uid: rekord-neovereny
+        title: Rekordman čeká na ověření
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                max(delta(flagged_trips[15m]))
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        labels:
+          severity: info
+        annotations:
+          summary: Přibyl spoj se zpožděním nad ALERT_DELAY_S
+          description: >-
+            Rekordman se na webu zobrazí jako neověřený (ADR-0055). Ručně ověřte proti zprávám DPP a případně spoj vyřaďte.

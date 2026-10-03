@@ -13,6 +13,7 @@ Zdroj dat: [Golemio](https://golemio.cz), licence CC BY 4.0. Projekt není ofici
 | [docs/adr/](docs/adr/README.md) | Rozhodnutí (ADR), každé v samostatném souboru |
 | [docs/metodika.md](docs/metodika.md) | Jak se počítá každé číslo |
 | [docs/technicke.md](docs/technicke.md) | Architektura, datový model, API, konfigurace, nasazení |
+| [docs/provoz.md](docs/provoz.md) | Nasazení do homelabu, monitoring a alerty, ověření AC-07 a AC-08 |
 | [docs/faze0.md](docs/faze0.md) | Zjištění z reálných dat |
 
 ## Spuštění
@@ -24,7 +25,8 @@ cd .. && docker compose up -d --build
 curl localhost:8080/api/health
 ```
 
-Podrobnosti v [docs/technicke.md – Vývoj](docs/technicke.md#vývoj).
+Podrobnosti v [docs/technicke.md – Vývoj](docs/technicke.md#vývoj). Nasazení do homelabu včetně
+monitoringu (`docker compose --profile monitoring up -d`) popisuje [docs/provoz.md](docs/provoz.md).
 
 První část webu je v [`web/`](web/README.md). Místní vývoj: `cd web && npm ci && npm run dev`;
 bez historie se zobrazí stav bez dat, `?demo=1` ukáže jasně označená ukázková čísla.
