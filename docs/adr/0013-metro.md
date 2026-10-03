@@ -10,7 +10,7 @@ Metro ve feedu je, ale za 2 h mělo max. 66 s zpoždění a 100 % odjezdů včas
 
 ## Rozhodnutí
 
-Metro se sbírá stejně jako ostatní. Na webu se zobrazí až po ověření při známé mimořádnosti; do té doby s poznámkou nebo skryté.
+Metro se sbírá stejně jako ostatní, na webu je **skryté**. Zobrazí se, až se v datech objeví odjezd metra se zpožděním ≥ 180 s v době ohlášené mimořádnosti (ruční ověření proti zprávám DPP). Pak se toto ADR změní na Přijato.
 
 ## Zvažované alternativy
 

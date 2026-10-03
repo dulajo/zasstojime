@@ -1,6 +1,6 @@
 # ADR-0004: Provozní den = datum výjezdu spoje
 
-- **Stav:** Přijato
+- **Stav:** Nahrazeno ADR-0050
 - **Oblast:** Metodika
 - **Datum:** 2026-10-02
 
@@ -21,3 +21,4 @@ Noční spoje přejíždějí půlnoc. Je potřeba určit, do kterého dne patř
 ## Důsledky
 
 - Výpočty musí správně zvládnout změnu času (DST); testy na 25 h a 23 h den.
+- Spoje, které PID jízdní řád vede po půlnoci (24:13 atd.), by spadly do jiného dne než podle PID. Viz ADR-0050.

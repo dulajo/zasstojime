@@ -44,9 +44,9 @@ Snapshot vstupuje do výpočtů, jen když platí **vše**:
 | `last_stop.sequence` neklesne pod dosud nejvyšší | Přeskok zpět na trase = chybné spárování |
 | `origin_timestamp` je mladší než 5 min | Vozidlo se reálně hlásí |
 | `origin_timestamp` je novější než poslední zpracovaný | Deduplikace |
-| Nárůst zpoždění odjezdu oproti předchozímu odjezdu ≤ uplynulý čas + 120 s | Zpoždění nemůže růst rychleji než čas |
+| Změna zpoždění odjezdu oproti předchozímu odjezdu (nárůst i pokles) ≤ uplynulý čas + 120 s | Zpoždění se nemůže měnit rychleji než čas (ADR-0035, ADR-0051) |
 
-Víc vozidel na jednom spoji (spřažené soupravy) → bere se nejnovější snapshot.
+Víc vozidel na jednom spoji → bere se vozidlo s nejnižší sekvencí, která je ≥ dosavadní maximální sekvenci spoje; u nového spoje to s nejnižší sekvencí (ADR-0052).
 
 ## Měření odjezdů
 
@@ -88,6 +88,9 @@ Víc vozidel na jednom spoji (spřažené soupravy) → bere se nejnovější sn
 Stavy `before_track`, `before_track_delayed` a `off_track` spoj neukončí, jen se nepoužijí pro výpočet.
 Zpoždění spoje, který vyjede pozdě z výchozí zastávky, se zachytí prvním odjezdem.
 Spoj bez jediného změřeného odjezdu se nepočítá.
+Odjezdy změřené před zrušením spoje se do indexu počítají (ADR-0054).
+
+**Provozní den** (ADR-0050): lokální datum `start_timestamp`, mínus 1 den, pokud jízdní řád uvádí výjezd spoje ≥ 24:00.
 
 ## Metriky (za provozní den)
 
@@ -128,7 +131,7 @@ Uživatel zvolí **linku, stanici nástupu, stanici výstupu, plánovaný čas o
 | Metrika | Výpočet (za zvolené období) |
 |---|---|
 | Měřeno | Počet dní, kdy byl spoj změřen v nástupní i výstupní stanici |
-| Včas na nástupu | Počet dní s odjezdem v toleranci (−59 až +179 s) / měřeno |
+| Včas na nástupu | Počet dní s odjezdem v toleranci (−59 až +179 s) / měřeno. Když odjezd chybí, použije se příjezd a den se označí „odhad“ (ADR-0053) |
 | Průměrné čekání navíc | Průměr max(0, zpoždění odjezdu v A) |
 | Zpoždění v cíli | Průměr a maximum zpoždění příjezdu do B (když chybí, zpoždění odjezdu z B) |
 | Jízda navíc | Průměr (zpoždění v B − zpoždění v A) |
@@ -143,6 +146,8 @@ Uživatel zvolí **linku, stanici nástupu, stanici výstupu, plánovaný čas o
 | Největší součet zpoždění | Σ `max_delay` za linku | — |
 | Nejvyšší zpoždění na spoj | Σ `max_delay` / počet spojů | ≥ 20 `finished` |
 | Nejhorší dochvilnost | Index dochvilnosti linky (z odjezdů) | ≥ 20 `finished` |
-| Rekordman dne | Spoj s nejvyšším `max_delay` | — |
+| Rekordman dne | Spoj s nejvyšším `max_delay` | `excluded = false` |
 
-Zpoždění nad 2 h se zobrazí, ale pošle se upozornění správci ke kontrole.
+Zpoždění nad `ALERT_DELAY_S` (2 h) se zobrazí se štítkem „neověřeno“ (`flagged`), dokud ho správce nepotvrdí (`verified`) nebo nevyřadí (`excluded`) (ADR-0055).
+
+Součty používají vždy `max(0, …)`, takže záporné zpoždění (jízda napřed) nikdy součet nesnižuje.

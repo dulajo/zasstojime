@@ -36,6 +36,7 @@ ukládá je a poskytuje read-only API pro dashboard dochvilnosti a funkci „Moj
 | ID | Požadavek | ADR |
 |---|---|---|
 | FR-01 | Stáhnout `https://data.pid.cz/PID_GTFS.zip` při startu (pokud je import starší než 24 h) a každou noc ve 04:30. | 0002 |
+| FR-02a | Naplnit `gtfs_trips` (`trip_id`, linka, čas výjezdu z první zastávky v `stop_times.txt`, včetně časů ≥ 24:00). | 0050 |
 | FR-02 | Naplnit `routes` (kategorie podle `route_type` + `is_regional`; příznaky `is_night`, `is_substitute`) a `stops` (`node_id` = `asw_node_id`, prázdné = technický bod). UPSERT, nic nemazat. | 0002, 0045 |
 | FR-03 | Selhání importu nesmí zastavit sběr; použije se poslední úspěšný import a nastaví se metrika/alert. | — |
 | FR-04 | Naplnit `calendar_days` na 2 roky dopředu včetně českých státních svátků (Velikonoce počítat). | 0046 |
@@ -74,11 +75,14 @@ ukládá je a poskytuje read-only API pro dashboard dochvilnosti a funkci „Moj
 fetch_time = now()
 snapshot = GET golemio                                   // při chybě: ingest_runs(ok=false), konec cyklu
 
-// 1) deduplikace spřažených souprav
-group features by trip_id, keep max(origin_timestamp)
+// 1) výběr vozidla, když je jeden spoj hlášen víckrát
+group features by trip_id
+for each group: pick vehicle with min(seq) where seq >= trip.max_seq   // ADR-0052
+                (nový spoj: min(seq)); ostatní ignorovat a počítat do metriky
 
 for each feature f:
     service_date = local_date(f.trip.start_timestamp)    // null → přeskočit, počítat do metriky
+    if gtfs_trips[trip_id].first_departure >= 24:00: service_date -= 1 day   // ADR-0050
     trip = state[(service_date, trip_id)] ?: new Trip(...)  // linka, kategorie, směr z routes/feedu
     trip.last_seen_at = fetch_time
     st = f.last_position.state_position
@@ -121,7 +125,7 @@ for each feature f:
     if f.delay.last_stop_arrival != null:   trip.pending.arr = f.delay.last_stop_arrival
     if f.delay.last_stop_departure != null: trip.pending.dep = f.delay.last_stop_departure
 
-// 9) timeout
+// 9) timeout – běží jen po úspěšném cyklu, takže výpadek sběru spoje neukončí
 for each running trip with fetch_time - trip.last_valid_at > TRIP_TIMEOUT_S (900 s):
     close_pending(trip); trip.status = finished; trip.finished_by = timeout
 
@@ -136,13 +140,15 @@ close_pending(trip, f, terminus = false):
     emit StopEvent(service_date, trip_id, p.seq, route_id, p.stop_id, node, p.planned_arr, p.planned_dep, p.arr, p.dep)
     if p.dep != null:
         update trip counters (dep_total, on_time, early, late, late_sum), last_delay, max_delay(+at, +stop)
+        if trip.max_delay > ALERT_DELAY_S: trip.flagged = true                // ADR-0055
         trip.last_dep_delay = p.dep; trip.last_dep_origin_ts = origin_timestamp aktuálního snímku
     trip.pending = null
 
 plausible(trip, p):
     // nárůst zpoždění oproti poslednímu změřenému odjezdu ≤ uplynulý čas + MAX_DELAY_JUMP_S
     if trip.last_dep_delay == null: return true           // první odjezd spoje
-    return p.dep - trip.last_dep_delay <= (origin_timestamp - trip.last_dep_origin_ts) + MAX_DELAY_JUMP_S
+    elapsed = origin_timestamp - trip.last_dep_origin_ts
+    return abs(p.dep - trip.last_dep_delay) <= elapsed + MAX_DELAY_JUMP_S   // ADR-0035, ADR-0051
 ```
 
 Pozn.: první zastávka spoje má jen odjezd, konečná jen příjezd. Obojí se ukládá.
@@ -151,12 +157,16 @@ Pozn.: první zastávka spoje má jen odjezd, konečná jen příjezd. Obojí se
 
 | Případ | Chování | ADR / FR |
 |---|---|---|
-| Golemio nedostupné / timeout / 5xx / 401 | Cyklus se přeskočí, `ingest_runs.ok=false`; alert po 5 min bez úspěchu | FR-11, 0030 |
+| Golemio nedostupné / timeout / 5xx / 401 | Cyklus se přeskočí, `ingest_runs.ok=false`; alert po 5 min bez úspěchu. Timeout spojů se nevyhodnocuje, dokud nepřijde úspěšný snímek. | FR-11, 0030 |
+| Výpadek sběru delší než 15 min | Po obnovení první úspěšný snímek nejdřív aktualizuje jedoucí spoje, teprve pak se vyhodnotí timeout. Spoj, který mezitím dojel, se ukončí timeoutem. | 0042 |
 | Restart serveru | Stav se obnoví z DB; rozpracovaná zastávka se ztratí | FR-14 |
-| Spoj přes půlnoc | Celý patří do dne výjezdu | 0004 |
-| Změna času (23 h / 25 h den) | Hodiny a dny počítat v Europe/Prague; testy | 0004 |
-| Spřažené soupravy (dvě vozidla, jeden spoj) | Nejnovější snímek | krok 1 |
-| Přeskok zpět na trase | Snímek ignorován | 0040 |
+| Spoj přes půlnoc / výjezd ≥ 24:00 v jízdním řádu | Celý patří do servisního dne podle jízdního řádu | 0050 |
+| Změna času (23 h / 25 h den) | Dny a hodiny v Europe/Prague; na podzim se hodina 02:00 sečte, na jaře chybí | 0050 |
+| Dvě vozidla hlášená pro jeden spoj | Vozidlo, které navazuje na průběh spoje | 0052 |
+| Přeskok zpět na trase (i dlouhodobý) | Snímek ignorován. Dlouhé přeskoky v záznamu byly vozidla jedoucí opačným směrem, tedy chybně přiřazená. | 0040 |
+| Nereálný nárůst nebo pokles zpoždění | Odjezd se zahodí | 0035, 0051 |
+| Zrušení za jízdy | Změřené odjezdy se počítají, spoj `canceled` | 0054 |
+| Rekordman > 2 h | Příznak „neověřeno“, metrika pro alert | 0055 |
 | Spoj zmizí bez `after_track` | Timeout 15 min | 0042 |
 | `after_track` a pak znovu na trase | Znovuotevření do 15 min | 0042 |
 | Zrušení za jízdy | Změřené průjezdy zůstanou, spoj `canceled` | 0009 |
@@ -176,7 +186,8 @@ Pozn.: první zastávka spoje má jen odjezd, konečná jen příjezd. Obojí se
 | NFR-06 | API klíč jen v proměnné prostředí / `.env` mimo git; nikdy v logu. |
 | NFR-07 | Všechny časy uložené jako `TIMESTAMPTZ`; výpočty dnů a hodin v Europe/Prague. |
 | NFR-08 | Atribuce zdroje (Golemio, CC BY 4.0) v API (`source`) i na webu. |
-| NFR-09 | Metriky Prometheus: délka cyklu, počet vozidel, nové průjezdy, chyby Golemia, stáří dat, velikost DB. |
+| NFR-09 | Metriky Prometheus: délka cyklu, počet vozidel, nové průjezdy, zahozené odjezdy (podle důvodu), ignorovaná vozidla, chyby Golemia, stáří dat, `flagged_trips`, velikost DB. |
+| NFR-10 | Alerty přes Grafana Alerting → Telegram (ADR-0030). |
 
 ## 7. Testování a akceptační kritéria
 
@@ -184,7 +195,9 @@ Pozn.: první zastávka spoje má jen odjezd, konečná jen příjezd. Obojí se
 |---|---|
 | AC-01 | Jednotkové testy stavového automatu pokrývají všechny řádky kapitoly 5. |
 | AC-02 | Testy pro `close_pending`: běžný odjezd, konečná (jen příjezd), technický bod, nereálný skok, `null` hodnoty. |
-| AC-03 | Testy výpočtu provozního dne a hodin pro 23h a 25h den a spoj přes půlnoc. |
+| AC-03 | Testy výpočtu provozního dne a hodin pro 23h a 25h den, spoj přes půlnoc a spoj s výjezdem 24:13 v jízdním řádu. |
+| AC-09 | Test výpadku: 20 min bez úspěšného snímku nesmí ukončit spoje, které po obnovení dál jedou. |
+| AC-10 | Test výběru vozidla: dvě vozidla na jednom spoji se sekvencemi 9 a 1 → použije se navazující. |
 | AC-04 | Testy `calendar_days`: všechny české svátky 2026–2027 včetně Velikonočního pondělí a Velkého pátku. |
 | AC-05 | Fixture: 30 min reálných snímků (xz, ~4 MB) v `src/test/resources`. Přehrání dá deterministický výsledek; počet průjezdů, index po kategoriích a top 5 zpoždění se ověří snapshot testem. |
 | AC-06 | Integrační test proti PostgreSQL (Dev Services): migrace, UPSERT, oddíly `stop_events`, dotaz Moje trasa na fixture. |
@@ -210,7 +223,7 @@ Pozn.: první zastávka spoje má jen odjezd, konečná jen příjezd. Obojí se
 | R1 | Golemio změní formát nebo omezí přístup | Sběr stojí | Alert; parsování tolerantní k novým polím |
 | R2 | Rate limit Golemia neznámý | Odmítnuté požadavky | 1 požadavek / 30 s; sledovat 429 |
 | R3 | Výpadky homelabu | Díry v historii | `incomplete`, poctivé „měřeno N z M dní“ |
-| R4 | Metro má možná dopočítané zpoždění | Zavádějící čísla | ADR-0013, ověřit při mimořádnosti |
+| R4 | Metro má možná dopočítané zpoždění | Zavádějící čísla | ADR-0013: na webu skryté do ověření |
 | R5 | Odhady objemu jsou z večerního záznamu | DB roste rychleji | Změřit po prvním dni; NFR-04 |
 | Q1 | Výsledný název a doména | — | Před Fází 2 |
 | Q2 | Co ukazovat po půlnoci (nový den má skoro nulová čísla) | UX | Před Fází 2 |

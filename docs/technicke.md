@@ -8,7 +8,7 @@
        ▼                          ▼
 [ Server (Quarkus) ] ─────▶ [ PostgreSQL ]
   ingest  – validace, stavový automat spoje, finalizace
-  gtfs    – import linek a zastávek
+  gtfs    – import linek, zastávek a časů výjezdů spojů
   aggregation – živá čísla v paměti; denní tabulky do DB každých 5 min
   api     – předpočítané JSON odpovědi
        │
@@ -42,6 +42,7 @@ Výchozí návrh. Po založení projektu se přesune do Flyway migrace `V1__init
 |---|---|---|---|
 | `routes` | linka z PID GTFS | přepis denně | ~900 řádků |
 | `stops` | zastávka / nástupiště z PID GTFS | přepis denně | ~20 tis. řádků |
+| `gtfs_trips` | spoj z jízdního řádu: linka, čas výjezdu | přepis denně | ~90 tis. řádků |
 | `calendar_days` | den s typem (pracovní / sobota / neděle a svátek) | trvale | 365 řádků/rok |
 | `trips_daily` | spoj × provozní den | 13 měsíců | ~40 tis. řádků/den |
 | `stop_events` | průjezd spoje zastávkou | 13 měsíců, oddíly po měsících | ~0,5 mil. řádků/den, ~2 GB/měsíc |
@@ -73,9 +74,16 @@ CREATE TABLE stops (
 );
 CREATE INDEX idx_stops_node ON stops (node_id);
 
+CREATE TABLE gtfs_trips (
+    trip_id         VARCHAR(64) PRIMARY KEY,
+    route_id        VARCHAR(32) NOT NULL,
+    first_departure INTERVAL    NOT NULL,     -- z stop_times, může být ≥ 24:00 (ADR-0050)
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE calendar_days (
     day           DATE        PRIMARY KEY,
-    day_type      VARCHAR(16) NOT NULL,      -- workday | saturday | sunday_holiday
+    day_type      VARCHAR(16) NOT NULL CHECK (day_type IN ('workday','saturday','sunday_holiday')),
     holiday_name  TEXT
 );
 
@@ -90,8 +98,8 @@ CREATE TABLE trips_daily (
     trip_start_at   TIMESTAMPTZ,
     first_seen_at   TIMESTAMPTZ NOT NULL,
     last_seen_at    TIMESTAMPTZ NOT NULL,
-    status          VARCHAR(12) NOT NULL,   -- running | finished | canceled
-    finished_by     VARCHAR(12),            -- after_track | timeout
+    status          VARCHAR(12) NOT NULL CHECK (status IN ('running','finished','canceled')),
+    finished_by     VARCHAR(12) CHECK (finished_by IN ('after_track','timeout')),
     last_delay      INTEGER,
     max_delay       INTEGER,
     max_delay_at    TIMESTAMPTZ,
@@ -103,7 +111,12 @@ CREATE TABLE trips_daily (
     dep_late        INTEGER     NOT NULL DEFAULT 0,
     dep_late_sum    BIGINT      NOT NULL DEFAULT 0,
     valid_snapshots INTEGER     NOT NULL DEFAULT 0,
-    PRIMARY KEY (service_date, trip_id)
+    flagged         BOOLEAN     NOT NULL DEFAULT false,   -- max_delay > ALERT_DELAY_S (ADR-0055)
+    verified        BOOLEAN     NOT NULL DEFAULT false,   -- správce potvrdil
+    excluded        BOOLEAN     NOT NULL DEFAULT false,   -- správce vyřadil z rekordmana
+    PRIMARY KEY (service_date, trip_id),
+    CHECK (dep_total = dep_on_time + dep_early + dep_late),
+    CHECK (dep_on_time >= 0 AND dep_early >= 0 AND dep_late >= 0 AND dep_late_sum >= 0)
 );
 CREATE INDEX idx_trips_route   ON trips_daily (service_date, route_id);
 CREATE INDEX idx_trips_running ON trips_daily (status) WHERE status = 'running';
@@ -193,6 +206,7 @@ CREATE TABLE ingest_runs (
     valid_snapshots INTEGER,
     error           TEXT
 );
+CREATE INDEX idx_ingest_started ON ingest_runs (started_at);
 ```
 
 ## API
@@ -220,7 +234,7 @@ Všechny odpovědi obsahují `generated_at` a `data_as_of`. Cache: `public, s-ma
 | `POLL_INTERVAL_S` | 30 | Interval sběru |
 | `TRIP_TIMEOUT_S` | 900 | Ukončení spoje bez snapshotu |
 | `MAX_DELAY_JUMP_S` | 120 | Tolerance nárůstu zpoždění nad uplynulý čas |
-| `ALERT_DELAY_S` | 7200 | Zpoždění, o kterém se pošle upozornění správci |
+| `ALERT_DELAY_S` | 7200 | Nad touto hodnotou dostane spoj příznak „neověřeno“ a metriku pro alert (ADR-0055) |
 | `DAILY_FLUSH_S` | 300 | Interval zápisu denních tabulek do DB |
 | `MIN_TRIPS` | 20 | Minimum spojů pro žebříčky |
 | `RAW_ARCHIVE` | false | Ukládat surové snímky (ADR-0018) |
@@ -231,7 +245,10 @@ Všechny odpovědi obsahují `generated_at` a `data_as_of`. Cache: `public, s-ma
 | Oblast | Pravidlo |
 |---|---|
 | Alert | Poslední úspěšný běh starší než 5 min |
-| Díry v datech | Výpadek > 30 min za den → v API `incomplete: true` |
+| Díry v datech | Pro provozní den: součet mezer mezi po sobě jdoucími **úspěšnými** běhy v `ingest_runs`, které jsou delší než 90 s (od každé se odečte 30 s). Součet > 30 min → `incomplete: true` |
+| Změna času | Hodina = hodina plánovaného odjezdu v Europe/Prague. Na podzim se dvě hodiny 02:00 sečtou do jedné, na jaře hodina 02:00 chybí. Přijatelné, uvedeno v metodice. |
+| Součty | `sum_max_delay` se počítá jako `SUM(GREATEST(0, max_delay))` |
+| Alerty | Grafana Alerting → Telegram (ADR-0030) |
 | Jednotkové testy | Stavový automat (včetně znovuotevření), měření odjezdů, přeskok zpět, nereálné skoky, půlnoc, změna času |
 | Integrační testy | Nahrané payloady z Fáze 0 → deterministické agregáty |
 | Zálohy | Denní `pg_dump` mimo homelab |
