@@ -23,17 +23,29 @@ export function formatDate(date: string): string {
     .format(new Date(`${date}T12:00:00Z`));
 }
 
-export function formatTimestamp(value: string | null): string {
-  if (!value) return "bez úspěšného sběru";
+export function formatTimestamp(value: string): string {
   return new Intl.DateTimeFormat("cs-CZ", {
     timeZone: "Europe/Prague", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit",
   }).format(new Date(value));
 }
 
-export function todayInPrague(): string {
+function pragueParts(now: Date): Record<string, string> {
   const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Europe/Prague", year: "numeric", month: "2-digit", day: "2-digit",
-  }).formatToParts(new Date());
-  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+    timeZone: "Europe/Prague", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23",
+  }).formatToParts(now);
+  return Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+}
+
+export function todayInPrague(now = new Date()): string {
+  const values = pragueParts(now);
   return `${values.year}-${values.month}-${values.day}`;
+}
+
+/** Dnešek a do 06:00 i včerejšek, jehož provozní den se ještě uzavírá (ADR-0050). */
+export function isLiveDay(date: string, now = new Date()): boolean {
+  const today = todayInPrague(now);
+  if (date === today) return true;
+  const yesterday = new Date(`${today}T12:00:00Z`);
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+  return date === yesterday.toISOString().slice(0, 10) && Number(pragueParts(now).hour) < 6;
 }

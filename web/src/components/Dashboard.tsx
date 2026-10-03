@@ -1,10 +1,10 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError, type Day, type Leaderboard, type RecordDay, type RouteRank } from "@/lib/api";
 import { demoData } from "@/lib/demo-data";
-import { formatDate, formatDuration, formatNumber, formatPercent, formatTimestamp, todayInPrague } from "@/lib/format";
+import { formatDate, formatDuration, formatNumber, formatPercent, formatTimestamp, isLiveDay, todayInPrague } from "@/lib/format";
 
 const categoryNames: Record<string, string> = {
   tram: "Tramvaje",
@@ -39,12 +39,14 @@ function Ranking({ title, subtitle, items, value }: {
   </section>;
 }
 
-function Overview({ day, leaderboard, record }: {
-  day: Day; leaderboard?: Leaderboard; record?: RecordDay;
+type Loaded<T> = { data?: T; failed: boolean };
+
+function Overview({ day, isToday, leaderboard, record }: {
+  day: Day; isToday: boolean; leaderboard: Loaded<Leaderboard>; record: Loaded<RecordDay>;
 }) {
-  const categories = Object.entries(day.categories).filter(([key]) => key !== "metro");
+  const categories = Object.entries(day.categories);
   return <>
-    {day.incomplete && <div className="notice">Sběr měl dnes delší výpadek. Uvedená čísla jsou neúplná.</div>}
+    {day.incomplete && <div className="notice">Sběr měl {isToday ? "dnes" : "v tento den"} delší výpadek. Uvedená čísla jsou neúplná.</div>}
     <section aria-labelledby="overview-title" className="section-block">
       <div className="section-heading"><div><span className="section-kicker">Přehled dne</span><h2 id="overview-title">Co ukazují odjezdy</h2></div>
         <p>Dochvilnost počítáme při odjezdu z každé zastávky, ne až na konečné.</p></div>
@@ -71,43 +73,65 @@ function Overview({ day, leaderboard, record }: {
     <section aria-labelledby="rankings-title" className="section-block">
       <div className="section-heading"><div><span className="section-kicker">Linky pod lupou</span><h2 id="rankings-title">Dnešní žebříčky</h2></div>
         <p>U průměrů a dochvilnosti zobrazujeme linky s alespoň 20 dokončenými spoji.</p></div>
-      {leaderboard ? <div className="ranking-grid">
-        <Ranking title="Největší součet" subtitle="Zpoždění spojů na lince" items={leaderboard.most_total_delay} value={(item) => formatDuration(item.totals.sum_max_delay)} />
-        <Ranking title="Nejvíc na spoj" subtitle="Průměrné maximum spoje" items={leaderboard.highest_delay_per_trip} value={(item) => formatDuration(item.average_max_delay_s)} />
-        <Ranking title="Nejhorší dochvilnost" subtitle="Podíl odjezdů včas" items={leaderboard.worst_punctuality} value={(item) => formatPercent(item.totals.punctuality_pct)} />
-      </div> : <div className="empty-panel">Žebříčky se zatím nepodařilo načíst.</div>}
+      {leaderboard.data ? <div className="ranking-grid">
+        <Ranking title="Největší součet" subtitle="Zpoždění spojů na lince" items={leaderboard.data.most_total_delay} value={(item) => formatDuration(item.totals.sum_max_delay)} />
+        <Ranking title="Nejvíc na spoj" subtitle="Průměrné maximum spoje" items={leaderboard.data.highest_delay_per_trip} value={(item) => formatDuration(item.average_max_delay_s)} />
+        <Ranking title="Nejhorší dochvilnost" subtitle="Podíl odjezdů včas" items={leaderboard.data.worst_punctuality} value={(item) => formatPercent(item.totals.punctuality_pct)} />
+      </div> : <div className="empty-panel">{leaderboard.failed ? "Žebříčky se nepodařilo načíst." : "Načítáme žebříčky…"}</div>}
     </section>
 
     <section aria-labelledby="record-title" className="record-panel">
       <div><span className="section-kicker">Rekordman dne</span><h2 id="record-title">Největší zpoždění na trase</h2>
         <p>Bereme nejvyšší změřené zpoždění odjezdu, ne průběžný odhad polohy vozidla.</p></div>
-      {record?.record ? <div className="record-result">
-        <span>Linka {record.record.line}{record.record.headsign ? ` · ${record.record.headsign}` : ""}</span>
-        <strong>+{formatDuration(record.record.delay_s)}</strong>
-        {record.record.flagged && !record.record.verified && <em>Neověřeno</em>}
-      </div> : <div className="record-result"><span>Rekord pro tento den zatím nemáme.</span></div>}
+      {record.data?.record ? <div className="record-result">
+        <span>Linka {record.data.record.line}{record.data.record.headsign ? ` · ${record.data.record.headsign}` : ""}</span>
+        <strong>+{formatDuration(record.data.record.delay_s)}</strong>
+        {record.data.record.flagged && !record.data.record.verified && <em>Neověřeno</em>}
+      </div> : <div className="record-result"><span>{record.data ? "Rekord pro tento den zatím nemáme." :
+        record.failed ? "Rekord se nepodařilo načíst." : "Načítáme rekord…"}</span></div>}
     </section>
   </>;
 }
 
+const notFound = (error: unknown) => error instanceof ApiError && error.status === 404;
+const retry = (failures: number, error: unknown) => !notFound(error) && failures < 3;
+
 export function Dashboard() {
   const [date, setDate] = useState("");
+  const [today, setToday] = useState("");
   const [demo, setDemo] = useState(false);
+  const todayRef = useRef("");
   useEffect(() => {
-    setDate(todayInPrague());
     setDemo(new URLSearchParams(window.location.search).get("demo") === "1");
+    // Po půlnoci posuneme výběr na nový den, pokud uživatel sledoval ten dosavadní.
+    const tick = () => {
+      const next = todayInPrague();
+      const previous = todayRef.current;
+      if (next === previous) return;
+      todayRef.current = next;
+      setToday(next);
+      setDate((current) => !current || current === previous ? next : current);
+    };
+    tick();
+    const timer = window.setInterval(tick, 60_000);
+    return () => window.clearInterval(timer);
   }, []);
+  const live = Boolean(date) && isLiveDay(date);
+  const refetchInterval = (query: { state: { status: string } }) => live && query.state.status === "success" ? 30_000 : false;
   const sample = useMemo(() => date && demo ? demoData(date) : null, [date, demo]);
   const dayQuery = useQuery({ queryKey: ["day", date], queryFn: ({ signal }) => api.day(date, signal),
-    enabled: Boolean(date) && !demo, refetchInterval: 30_000 });
+    enabled: Boolean(date) && !demo, refetchInterval, retry });
   const leaderboardQuery = useQuery({ queryKey: ["leaderboard", date], queryFn: ({ signal }) => api.leaderboard(date, signal),
-    enabled: Boolean(dayQuery.data) && !demo, refetchInterval: 30_000 });
+    enabled: Boolean(dayQuery.data) && !demo, refetchInterval, retry });
   const recordQuery = useQuery({ queryKey: ["record", date], queryFn: ({ signal }) => api.record(date, signal),
-    enabled: Boolean(dayQuery.data) && !demo, refetchInterval: 30_000 });
+    enabled: Boolean(dayQuery.data) && !demo, refetchInterval, retry });
   const day = sample?.day ?? dayQuery.data;
-  const leaderboard = sample?.leaderboard ?? leaderboardQuery.data;
-  const record = sample?.record ?? recordQuery.data;
-  const noData = dayQuery.error instanceof ApiError && dayQuery.error.status === 404;
+  const leaderboard = sample ? { data: sample.leaderboard, failed: false } :
+    { data: leaderboardQuery.data, failed: leaderboardQuery.isError };
+  const record = sample ? { data: sample.record, failed: false } :
+    { data: recordQuery.data, failed: recordQuery.isError };
+  const noData = notFound(dayQuery.error);
+  const dataAsOf = day ? day.data_as_of ? `Data k ${formatTimestamp(day.data_as_of)}` : "Zatím bez úspěšného sběru" : "";
 
   return <main>
     <header className="topbar"><div className="shell topbar-inner">
@@ -123,12 +147,12 @@ export function Dashboard() {
       </div><div className="hero-side"><span>01 / Přehled sítě</span><strong>Data místo odhadů.</strong><small>Zdroj: Golemio · CC BY 4.0</small></div></section>
 
       <div className="toolbar"><div><span className="section-kicker">Provozní den</span><label htmlFor="day-select" className="sr-only">Vyberte den</label>
-        <input id="day-select" type="date" value={date} max={todayInPrague()} onChange={(event) => setDate(event.target.value)} /></div>
-        <div className="toolbar-meta"><span>{date ? formatDate(date) : "Načítáme datum"}</span><small>Data k {formatTimestamp(day?.data_as_of ?? null)}</small></div></div>
+        <input id="day-select" type="date" value={date} max={today} onChange={(event) => event.target.value && setDate(event.target.value)} /></div>
+        <div className="toolbar-meta"><span>{date ? formatDate(date) : "Načítáme datum"}</span>{dataAsOf && <small>{dataAsOf}</small>}</div></div>
 
       {demo && <div className="demo-notice"><strong>Ukázková data</strong><span>Tato čísla jsou vymyšlená pro návrh webu. Nejde o údaje PID.</span></div>}
       {!date || (!demo && dayQuery.isPending) ? <div className="state-panel">Načítáme přehled dne…</div> :
-        day ? <Overview day={day} leaderboard={leaderboard} record={record} /> :
+        day ? <Overview day={day} isToday={date === today} leaderboard={leaderboard} record={record} /> :
           <div className="state-panel"><span className="state-icon">∅</span><h2>{noData ? "Na tento den ještě nemáme data" : "Přehled se nepodařilo načíst"}</h2>
             <p>{noData ? "Sběr historie začne po spuštění serveru. Mezitím si můžete prohlédnout podobu dashboardu s jasně označenými ukázkovými čísly." : "Zkuste stránku za chvíli obnovit. Dostupnost zdroje ověříme znovu."}</p>
             {noData && <a className="button-link" href="/?demo=1">Zobrazit ukázku <span aria-hidden>↗</span></a>}

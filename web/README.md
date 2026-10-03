@@ -24,8 +24,8 @@ npm run dev
 
 Pokud API běží jinde, nastavte `NEXT_PUBLIC_API_BASE_URL` před spuštěním webu,
 například v lokálním `.env.local`. Tato veřejná adresa se při produkčním buildu
-vloží do statických souborů. Pro nasazení je nutné nastavit skutečnou veřejnou
-adresu API; výchozí `localhost:8080` slouží jen místnímu vývoji.
+vloží do statických souborů. Výchozí `localhost:8080` platí jen pro `npm run dev`;
+`npm run build` bez nastavené adresy skončí chybou.
 
 ## API kontrakt a build
 
@@ -36,8 +36,11 @@ vygeneruje typy. Aktualizované soubory patří do stejného commitu jako změna
 
 ```bash
 npm run typecheck
-npm run build
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8080 npm run build
 ```
+
+`npm run typecheck` nejdřív vygeneruje typy Next.js (`next-env.d.ts` a
+`.next/types`); tyto soubory nejsou v gitu.
 
 Build vytváří statický výstup v `out/`, připravený pro pozdější hosting na
 Cloudflare Pages. Web zatím není nasazen. Výběr „Moje trasa“ přijde po

@@ -11,8 +11,9 @@ for (const name of ["DayResponse", "LeaderboardResponse", "RecordResponse", "MyR
   }
 }
 await writeFile(new URL("../openapi.json", import.meta.url), `${JSON.stringify(schema, null, 2)}\n`);
-const command = process.platform === "win32" ? "npm.cmd" : "npm";
-const child = spawn(command, ["run", "api:generate"], { stdio: "inherit" });
+// Node 20.12+ spouští .cmd soubory na Windows jen přes shell (CVE-2024-27980).
+const windows = process.platform === "win32";
+const child = spawn(windows ? "npm.cmd" : "npm", ["run", "api:generate"], { stdio: "inherit", shell: windows });
 const exitCode = await new Promise((resolve, reject) => {
   child.on("error", reject);
   child.on("exit", (code) => resolve(code));
