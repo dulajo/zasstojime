@@ -16,6 +16,9 @@ import jakarta.ws.rs.core.MediaType
 import jakarta.ws.rs.core.Response
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import org.eclipse.microprofile.openapi.annotations.media.Content
+import org.eclipse.microprofile.openapi.annotations.media.Schema
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponse
 import java.time.Instant
 import java.time.LocalDate
 import java.time.format.DateTimeParseException
@@ -122,6 +125,7 @@ class DayResource(
 ) {
     @GET
     @Path("{date}")
+    @APIResponse(responseCode = "200", content = [Content(schema = Schema(implementation = DayResponse::class))])
     fun day(@PathParam("date") raw: String): Response {
         val date = parseDate(raw)
         val snapshot = load(date) ?: return Response.status(404).build()
@@ -129,17 +133,19 @@ class DayResource(
         val live = aggregation.snapshot(date) != null
         return cached(DayResponse(date.toString(), Instant.now().toString(),
             snapshot.dataAsOf?.toString() ?: coverage.dataAsOf?.toString(), coverage.incomplete,
-            snapshot.network.dto(), snapshot.categories.mapKeys { it.key.db }.mapValues { it.value.dto() },
+            snapshot.publicNetwork.dto(),
+            snapshot.categories.filterKeys { it.public }.mapKeys { it.key.db }.mapValues { it.value.dto() },
             if (live) snapshot.runningTrips else null, if (live) snapshot.runningLateTrips else null))
     }
 
     @GET
     @Path("{date}/leaderboard")
+    @APIResponse(responseCode = "200", content = [Content(schema = Schema(implementation = LeaderboardResponse::class))])
     fun leaderboard(@PathParam("date") raw: String): Response {
         val date = parseDate(raw)
         val snapshot = load(date) ?: return Response.status(404).build()
         val coverage = repository.coverage(date)
-        val routes = snapshot.routes.values
+        val routes = snapshot.routes.values.filter { it.category.public }
         val eligible = routes.filter { it.totals.tripsFinished >= 20 }
         return cached(LeaderboardResponse(date.toString(), Instant.now().toString(),
             snapshot.dataAsOf?.toString() ?: coverage.dataAsOf?.toString(), coverage.incomplete,
@@ -151,6 +157,7 @@ class DayResource(
 
     @GET
     @Path("{date}/record")
+    @APIResponse(responseCode = "200", content = [Content(schema = Schema(implementation = RecordResponse::class))])
     fun record(@PathParam("date") raw: String): Response {
         val date = parseDate(raw)
         val snapshot = load(date) ?: return Response.status(404).build()
@@ -162,6 +169,7 @@ class DayResource(
 
     @GET
     @Path("{date}/hourly")
+    @APIResponse(responseCode = "200", content = [Content(schema = Schema(implementation = HourlyResponse::class))])
     fun hourly(@PathParam("date") raw: String): Response {
         val date = parseDate(raw)
         val snapshot = load(date) ?: return Response.status(404).build()

@@ -43,17 +43,25 @@ class AggregationRepositoryIT {
             at.minusSeconds(30), at, 200, 240)
         val destination = StopEvent(day, trip.key.tripId, 2, trip.routeId, "AGG-DEST", 98766,
             at.plusSeconds(600), at.plusSeconds(610), 300, null)
-        ingest.persistCycle(listOf(trip), listOf(event, destination), IngestRun(at, at, true, 1, 1, 2))
+        val metro = TripState(TripKey(day, "aggregation-metro"), "AGG-M", "A", Category.METRO,
+            "Depo", null, at, at, at).apply {
+            status = TripStatus.FINISHED
+            depTotal = 5
+            depOnTime = 5
+            maxDelay = 600
+        }
+        ingest.persistCycle(listOf(trip, metro), listOf(event, destination), IngestRun(at, at, true, 2, 1, 2))
         dsl.execute("INSERT INTO calendar_days(day, day_type) VALUES (?, 'workday') ON CONFLICT (day) DO NOTHING", day)
-        dsl.execute("INSERT INTO routes(route_id, short_name, route_type, category) VALUES ('AGG', '97', 0, 'tram')")
+        dsl.execute("INSERT INTO routes(route_id, short_name, route_type, category) VALUES ('AGG', '97', 0, 'tram'), ('AGG-M', 'A', 1, 'metro')")
         dsl.execute("INSERT INTO stops(stop_id, name, node_id) VALUES ('AGG-STOP', 'Start', 98765), ('AGG-DEST', 'Cíl', 98766)")
 
-        aggregate.flush(DailyAggregation.calculate(day, listOf(trip), at))
-        aggregate.flush(DailyAggregation.calculate(day, listOf(trip), at)) // retry must not double count
+        aggregate.flush(DailyAggregation.calculate(day, listOf(trip, metro), at))
+        aggregate.flush(DailyAggregation.calculate(day, listOf(trip, metro), at)) // retry must not double count
         val loaded = dashboard.loadDay(day)!!
-        assertEquals(1, loaded.network.depTotal)
+        assertEquals(6, loaded.network.depTotal)
+        assertEquals(1, loaded.publicNetwork.depTotal)
         assertEquals(240L, loaded.network.depLateSum)
-        assertEquals(240L, loaded.network.sumMaxDelay)
+        assertEquals(240L, loaded.publicNetwork.sumMaxDelay)
         assertEquals(1, dashboard.hourly(day).single().totals.depLate)
         assertEquals(7, dashboard.hourly(day).single().hour)
         assertEquals("aggregation-fixture", dashboard.record(day)?.tripId)
@@ -67,7 +75,8 @@ class AggregationRepositoryIT {
         val response = HttpClient.newBuilder().proxy(HttpClient.Builder.NO_PROXY).build()
             .send(request, HttpResponse.BodyHandlers.ofString())
         assertEquals(200, response.statusCode(), response.body())
-        assertTrue(response.body().contains("\"dep_total\":1"), response.body())
+        assertTrue(response.body().contains("\"network\":{\"trips_total\":1,"), response.body())
+        assertTrue(!response.body().contains("\"metro\""), response.body())
         assertTrue(response.headers().firstValue("Cache-Control").orElse("").contains("s-maxage=30"))
 
         for (path in listOf("/api/day/$day/leaderboard", "/api/day/$day/record", "/api/day/$day/hourly")) {
@@ -76,6 +85,7 @@ class AggregationRepositoryIT {
                     HttpResponse.BodyHandlers.ofString())
             assertEquals(200, result.statusCode(), result.body())
             assertTrue(result.body().contains("\"incomplete\""), result.body())
+            assertTrue(!result.body().contains("AGG-M") && !result.body().contains("aggregation-metro"), result.body())
         }
 
         val routeRequest = HttpRequest.newBuilder(URI.create(

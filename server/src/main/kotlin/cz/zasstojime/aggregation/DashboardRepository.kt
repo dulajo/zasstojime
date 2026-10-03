@@ -35,7 +35,8 @@ class DashboardRepository(private val dsl: DSLContext) {
     fun record(day: LocalDate): RecordTrip? = dsl.fetchOne(
         """SELECT trip_id, route_short, headsign, max_delay, max_delay_at, max_delay_stop, flagged, verified
            FROM trips_daily WHERE service_date = ? AND excluded = false AND max_delay IS NOT NULL
-           ORDER BY max_delay DESC, trip_id LIMIT 1""", day,
+             AND category <> ALL(?)
+           ORDER BY max_delay DESC, trip_id LIMIT 1""", day, HIDDEN_CATEGORIES,
     )?.let { row ->
         RecordTrip(row.get("trip_id", String::class.java), row.get("route_short", String::class.java),
             row.get("headsign", String::class.java), row.int("max_delay"),
@@ -48,6 +49,7 @@ class DashboardRepository(private val dsl: DSLContext) {
     fun hourly(day: LocalDate): List<HourlyPoint> = dsl.fetch(
         "SELECT * FROM hourly_stats WHERE service_date = ? ORDER BY hour, category", day,
     ).map { HourlyPoint(it.int("hour"), it.get("category", String::class.java), it.totals()) }
+        .filter { Category.fromDb(it.category).public }
 
     /** Gaps between successful runs longer than 90 s contribute their excess over 30 s. */
     fun coverage(day: LocalDate): DayCoverage {
@@ -68,6 +70,8 @@ class DashboardRepository(private val dsl: DSLContext) {
         return DayCoverage(asOf, asOf == null || gap > 1800)
     }
 }
+
+private val HIDDEN_CATEGORIES = Category.entries.filterNot { it.public }.map { it.db }.toTypedArray()
 
 private fun Record.int(name: String): Int = if (field(name) == null) 0 else get(name, Int::class.javaObjectType) ?: 0
 

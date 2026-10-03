@@ -50,4 +50,24 @@ class DailyAggregationTest {
         assertEquals(true, result.record?.flagged)
         assertNull(result.network.punctuality)
     }
+
+    @Test
+    fun `metro stays in stored totals but not in public network, record or running trips`() {
+        val metro = trip("metro", Category.METRO, "991").apply {
+            status = TripStatus.RUNNING; depTotal = 10; depOnTime = 10; maxDelay = 900; lastDelay = 900
+        }
+        val tram = trip("tram", Category.TRAM).apply {
+            status = TripStatus.RUNNING; depTotal = 4; depOnTime = 2; depLate = 2; depLateSum = 400
+            maxDelay = 200; lastDelay = 200
+        }
+        val result = DailyAggregation.calculate(day, listOf(metro, tram), now)
+        assertEquals(14, result.network.depTotal)
+        assertEquals(10, result.categories.getValue(Category.METRO).depTotal)
+        assertEquals(4, result.publicNetwork.depTotal)
+        assertEquals(50.0, result.publicNetwork.punctuality)
+        assertEquals(200L, result.publicNetwork.sumMaxDelay)
+        assertEquals("tram", result.record?.tripId)
+        assertEquals(1, result.runningTrips)
+        assertEquals(1, result.runningLateTrips)
+    }
 }
