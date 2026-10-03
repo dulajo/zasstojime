@@ -1,6 +1,8 @@
 package cz.zasstojime.api
 
 import io.quarkus.test.junit.QuarkusTest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -26,7 +28,14 @@ class HealthResourceTest {
 
     @Test
     fun `openapi a metriky jsou dostupne`() {
-        assertEquals(200, get("/q/openapi").statusCode())
+        val openapi = get("/q/openapi?format=json")
+        assertEquals(200, openapi.statusCode())
+        val schemas = Json.parseToJsonElement(openapi.body()).jsonObject["components"]!!
+            .jsonObject["schemas"]!!.jsonObject
+        val dayProperties = schemas["DayResponse"]!!.jsonObject["properties"]!!.jsonObject
+        val routeProperties = schemas["MyRouteResponse"]!!.jsonObject["properties"]!!.jsonObject
+        assertTrue(dayProperties.containsKey("network"))
+        assertTrue(routeProperties.containsKey("summary"))
         val metrics = get("/q/metrics")
         assertEquals(200, metrics.statusCode())
         assertTrue(metrics.body().contains("ingest_cycle_seconds"))

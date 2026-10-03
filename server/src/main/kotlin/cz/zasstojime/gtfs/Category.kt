@@ -9,6 +9,9 @@ enum class Category(val db: String) {
     TRAIN("train"),
     OTHER("other");
 
+    /** Metro se sbírá, ale na webu je skryté, dokud se neověří jeho zpoždění (ADR-0013). */
+    val public: Boolean get() = this != METRO
+
     companion object {
         fun of(routeType: Int, isRegional: Boolean): Category = when (routeType) {
             0 -> TRAM

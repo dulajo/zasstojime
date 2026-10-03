@@ -21,6 +21,10 @@ data class DailyTotals(
 ) {
     val punctuality: Double? get() = if (depTotal == 0) null else depOnTime * 100.0 / depTotal
     val averageLateDelay: Double? get() = if (depLate == 0) null else depLateSum.toDouble() / depLate
+
+    operator fun plus(o: DailyTotals) = DailyTotals(tripsTotal + o.tripsTotal, tripsFinished + o.tripsFinished,
+        tripsCanceled + o.tripsCanceled, depTotal + o.depTotal, depOnTime + o.depOnTime, depEarly + o.depEarly,
+        depLate + o.depLate, depLateSum + o.depLateSum, sumMaxDelay + o.sumMaxDelay, maxOf(maxDelay, o.maxDelay))
 }
 
 data class RouteTotals(val routeId: String, val routeShort: String, val category: Category, val totals: DailyTotals)
@@ -45,7 +49,12 @@ data class DaySnapshot(
     val record: RecordTrip?,
     val runningTrips: Int,
     val runningLateTrips: Int,
-)
+) {
+    /** Celá síť bez kategorií skrytých na webu (ADR-0013); uložené `network` je obsahuje. */
+    val publicNetwork: DailyTotals
+        get() = if (categories.isEmpty()) network
+        else categories.filterKeys { it.public }.values.fold(DailyTotals(), DailyTotals::plus)
+}
 
 /** Pure aggregation over the state already held by the ingest engine. */
 object DailyAggregation {
@@ -62,6 +71,7 @@ object DailyAggregation {
             network.add(trip)
             categories.getValue(trip.category).add(trip)
             routes.getOrPut(trip.routeId) { trip to Counter() }.second.add(trip)
+            if (!trip.category.public) continue
             if (trip.status == TripStatus.RUNNING) {
                 running++
                 if ((trip.lastDelay ?: 0) >= 180) runningLate++
