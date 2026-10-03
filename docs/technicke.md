@@ -158,3 +158,6 @@ Internet ─▶ Cloudflare (DNS, CDN) ─┬─▶ frontend (Cloudflare)
                                             │
                      správa jen přes WireGuard + NPM: Grafana, Prometheus, DB
 ```
+
+Postup nasazení, monitoring (`deploy/monitoring/`, profil `monitoring` v `docker-compose.yml`)
+a ověření AC-07/AC-08: [provoz.md](provoz.md).
