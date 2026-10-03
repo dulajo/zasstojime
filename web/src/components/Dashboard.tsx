@@ -117,7 +117,8 @@ export function Dashboard() {
     return () => window.clearInterval(timer);
   }, []);
   const live = Boolean(date) && isLiveDay(date);
-  const refetchInterval = (query: { state: { status: string } }) => live && query.state.status === "success" ? 30_000 : false;
+  // Dnešní data mohou nejprve vracet 404; další interval je musí načíst, až sběr začne.
+  const refetchInterval = live ? 30_000 : false;
   const sample = useMemo(() => date && demo ? demoData(date) : null, [date, demo]);
   const dayQuery = useQuery({ queryKey: ["day", date], queryFn: ({ signal }) => api.day(date, signal),
     enabled: Boolean(date) && !demo, refetchInterval, retry });
