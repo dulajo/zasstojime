@@ -380,6 +380,43 @@ class TripProcessorTest {
     }
 
     @Test
+    fun `po obnove z DB se max_delay nesnizi a pocitadla pokracuji`() {
+        val t0 = at(0)
+        val restored = TripState(key, "L1", "1", Category.TRAM, null, null, T0, t0, t0).apply {
+            status = TripStatus.RUNNING
+            depTotal = 3
+            depLate = 1
+            depOnTime = 2
+            depLateSum = 600
+            maxDelay = 600
+            lastDelay = 120
+            lastStopSeq = 5
+            maxSeq = 5
+            lastValidAt = t0
+            lastOriginAt = t0
+            lastDepOriginAt = t0
+        }
+        processor.restore(listOf(restored))
+        cycle(30, f(6, sec = 30, dep = 100))
+        cycle(60, f(7, sec = 60))
+        val t = trip()
+        assertEquals(600, t.maxDelay)
+        assertEquals(4, t.depTotal)
+        assertEquals(100, t.lastDelay)
+    }
+
+    @Test
+    fun `okruzni spoj projizdi stejnou zastavku dvakrat s ruznou sekvenci`() {
+        cycle(0, f(1, sec = 0, dep = 10, stopId = "S1"))
+        cycle(60, f(2, sec = 60, dep = 20, stopId = "S2"))
+        cycle(120, f(3, sec = 120, dep = 30, stopId = "S1"))
+        val r = cycle(180, f(4, sec = 180))
+        assertEquals(3, trip().depTotal)
+        assertEquals("S1", r.events.single().stopId)
+        assertEquals(3, r.events.single().stopSeq)
+    }
+
+    @Test
     fun `zmenene spoje obsahuji jen ty se zmenou, ne kazdy videny`() {
         cycle(0, f(1, sec = 0, dep = 0))
         trip().dirty = false
