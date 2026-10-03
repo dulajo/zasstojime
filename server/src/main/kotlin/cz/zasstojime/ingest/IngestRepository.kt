@@ -155,6 +155,8 @@ class IngestRepository(
         lastOriginAt = r.lastOriginAt?.toInstant()
         lastDepOriginAt = r.lastDepOriginAt?.toInstant()
         flagged = r.flagged
+        verified = r.verified
+        excluded = r.excluded
         maxSeq = r.lastStopSeq ?: 0
     }
 }
