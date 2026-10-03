@@ -6,6 +6,7 @@ export type RecordDay = components["schemas"]["RecordResponse"];
 export type Totals = components["schemas"]["TotalsDto"];
 export type RouteRank = components["schemas"]["RouteRankDto"];
 
+// Produkční build bez adresy zastaví scripts/check-build-env.mjs; localhost je jen pro `npm run dev`.
 const baseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080").replace(/\/$/, "");
 
 export class ApiError extends Error {
@@ -15,7 +16,7 @@ export class ApiError extends Error {
 }
 
 async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(`${baseUrl}${path}`, { signal, cache: "no-store" });
+  const response = await fetch(`${baseUrl}${path}`, { signal });
   if (!response.ok) throw new ApiError(response.status);
   return (await response.json()) as T;
 }
