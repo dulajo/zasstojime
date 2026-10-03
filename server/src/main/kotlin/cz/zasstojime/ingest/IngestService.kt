@@ -1,5 +1,6 @@
 package cz.zasstojime.ingest
 
+import cz.zasstojime.aggregation.AggregationService
 import cz.zasstojime.config.AppConfig
 import cz.zasstojime.config.JobsDisabled
 import cz.zasstojime.golemio.GolemioClient
@@ -26,6 +27,7 @@ class IngestService(
     private val config: AppConfig,
     private val golemio: GolemioClient,
     private val repository: IngestRepository,
+    private val aggregation: AggregationService,
     gtfs: GtfsCache,
     private val registry: MeterRegistry,
 ) {
@@ -78,6 +80,7 @@ class IngestService(
         val trips = repository.loadTrips(since)
         processor.restore(trips)
         lastSuccess = repository.lastSuccessfulRunAt()
+        aggregation.refresh(processor.allTrips(), lastSuccess)
         updateGauges()
         readyFlag = true
         log.infof("Obnoveno %d spojů od %s, sběr spuštěn", trips.size, since)
@@ -136,6 +139,8 @@ class IngestService(
             unsavedTrips.clear()
             unsavedEvents.clear()
             lastSuccess = fetchTime
+            aggregation.refresh(processor.allTrips(), fetchTime)
+            aggregation.flushDue(fetchTime)
             registry.counter("ingest_cycles_total", "result", "ok").increment()
             record(parsed, stats)
             evictOldTrips()

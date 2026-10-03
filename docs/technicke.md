@@ -69,6 +69,11 @@ Všechny odpovědi obsahují `generated_at` a `data_as_of`. Cache: `public, s-ma
 | `GET /api/my-route?line=&from=&to=&time=&day_type=&period=` | „Moje trasa“: metriky + jednotlivé dny |
 | `GET /api/health` | Poslední úspěšný běh, stáří dat; 503 při datech starších než 10 min |
 
+`/api/my-route` přijímá `period=30d|90d|13m` (výchozí `30d`). Nabídka zastávek a odjezdů
+vychází ze skutečně zaznamenaných průjezdů v `stop_events`; bez historie sběru je prázdná.
+Odjezdy v nabídce se berou z posledních 14 dní. Indexy a odezvu nad 13 měsíci dat je třeba
+změřit po naplnění databáze.
+
 ## Konfigurace (proměnné prostředí)
 
 | Proměnná | Výchozí | Význam |
@@ -95,7 +100,8 @@ server/
     gtfs/                             import PID GTFS, kategorie, kalendář se svátky
     ingest/                           TripProcessor (stavový automat, kap. 4 spec), cyklus sběru, zápis do DB
     persistence/                      jOOQ, oddíly stop_events, metrika velikosti DB
-    api/                              /api/health
+    aggregation/                      denní a hodinové souhrny, měsíční souhrn uzlů
+    api/                              /api/health, dashboard, linky a Moje trasa
   src/main/resources/db/migration/    Flyway
   src/test/resources/replay/          30 min reálných snímků + výřez GTFS (AC-05)
   tools/make_replay_fixture.py        tvorba fixture ze záznamu
