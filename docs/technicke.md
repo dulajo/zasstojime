@@ -24,190 +24,34 @@ Stav dnešních spojů drží server v paměti (včetně rozpracované zastávky
 |---|---|
 | Kotlin | `quarkus-kotlin` |
 | REST API | `quarkus-rest` + `quarkus-rest-kotlin-serialization` |
-| Volání Golemia | `quarkus-rest-client` |
+| Volání Golemia a stažení GTFS | `java.net.http.HttpClient` z JDK (gzip a proxy pod kontrolou, tělo se dá archivovat beze změny) |
 | Polling | `quarkus-scheduler` |
 | DB | `quarkus-jdbc-postgresql` + jOOQ |
 | Migrace | `quarkus-flyway` |
 | OpenAPI | `quarkus-smallrye-openapi` |
 | Metriky | `quarkus-micrometer-registry-prometheus` |
 | GTFS CSV | Apache Commons CSV |
-| Testy | JUnit 5, Dev Services (Postgres v Dockeru) |
+| Testy | JUnit 5, Dev Services (Postgres v Dockeru), `org.tukaani:xz` pro fixture |
 | Build | Gradle (Kotlin DSL), Java 21 |
 
 ## Datový model
 
-Výchozí návrh. Po založení projektu se přesune do Flyway migrace `V1__init.sql`.
+Schéma je ve Flyway migraci [`server/src/main/resources/db/migration/V1__init.sql`](../server/src/main/resources/db/migration/V1__init.sql);
+jOOQ z ní generuje třídy při buildu (`DDLDatabase`, bez běžící DB). Oproti původnímu návrhu:
 
-| Tabulka | 1 řádek = | Retence | Odhad velikosti |
-|---|---|---|---|
-| `routes` | linka z PID GTFS | přepis denně | ~900 řádků |
-| `stops` | zastávka / nástupiště z PID GTFS | přepis denně | ~20 tis. řádků |
-| `gtfs_trips` | spoj z jízdního řádu: linka, čas výjezdu | přepis denně | ~90 tis. řádků |
-| `calendar_days` | den s typem (pracovní / sobota / neděle a svátek) | trvale | 365 řádků/rok |
-| `trips_daily` | spoj × provozní den | 13 měsíců | ~40 tis. řádků/den |
-| `stop_events` | průjezd spoje zastávkou | 13 měsíců, oddíly po měsících | ~0,5 mil. řádků/den, ~2 GB/měsíc |
-| `stop_route_hourly` | měsíc × linka × stanice × typ dne × hodina | trvale | malá |
-| `hourly_stats` | den × hodina odjezdu × kategorie | trvale | malá |
-| `daily_route_stats` | den × linka | trvale | ~900 řádků/den |
-| `daily_network_stats` | den × kategorie (`all` = celá síť) | trvale | 7 řádků/den |
-| `ingest_runs` | jeden běh sběru | 13 měsíců (pokrytí dat pro „Moje trasa“) | ~2 900 řádků/den |
+| Změna | Důvod |
+|---|---|
+| `gtfs_trips.first_departure_s INTEGER` místo `first_departure INTERVAL` | Jednodušší mapování; hodnota může být ≥ 86 400 (výjezd ≥ 24:00) |
+| `trips_daily.finished_at`, `last_valid_at`, `last_origin_at`, `last_dep_origin_at` | Obnova po restartu (FR-14): znovuotevření, timeout, deduplikace a kontrola nereálného skoku pokračují tam, kde skončily |
+| `trips_daily.last_stop_seq` = poslední **uzavřená** zastávka | Po restartu se z ní obnoví nejvyšší sekvence; rozpracovaná zastávka se změří znovu |
+| `ingest_runs.stop_events` | FR-11: počet nových průjezdů v cyklu |
 
-```sql
-CREATE TABLE routes (
-    route_id      VARCHAR(32) PRIMARY KEY,
-    short_name    VARCHAR(16) NOT NULL,
-    route_type    SMALLINT    NOT NULL,
-    category      VARCHAR(16) NOT NULL,
-    is_night      BOOLEAN     NOT NULL DEFAULT false,
-    is_substitute BOOLEAN     NOT NULL DEFAULT false,
-    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+Oddíly `stop_events` se jmenují `stop_events_yYYYYmMM`. Server při startu a každou noc ve 03:15 zakládá minulý, tento a příští měsíc
+a maže oddíly starší než 13 měsíců; před zápisem průjezdu do dosud neznámého měsíce oddíl založí sám.
 
-CREATE TABLE stops (
-    stop_id       VARCHAR(32) PRIMARY KEY,   -- nástupiště, např. U142V5S
-    name          TEXT        NOT NULL,
-    node_id       INTEGER,                   -- asw_node_id = stanice; NULL = technický bod
-    platform_code VARCHAR(8),
-    lat           DOUBLE PRECISION,
-    lon           DOUBLE PRECISION,
-    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-CREATE INDEX idx_stops_node ON stops (node_id);
-
-CREATE TABLE gtfs_trips (
-    trip_id         VARCHAR(64) PRIMARY KEY,
-    route_id        VARCHAR(32) NOT NULL,
-    first_departure INTERVAL    NOT NULL,     -- z stop_times, může být ≥ 24:00 (ADR-0050)
-    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE TABLE calendar_days (
-    day           DATE        PRIMARY KEY,
-    day_type      VARCHAR(16) NOT NULL CHECK (day_type IN ('workday','saturday','sunday_holiday')),
-    holiday_name  TEXT
-);
-
-CREATE TABLE trips_daily (
-    service_date    DATE        NOT NULL,
-    trip_id         VARCHAR(64) NOT NULL,
-    route_id        VARCHAR(32) NOT NULL,
-    route_short     VARCHAR(16) NOT NULL,
-    category        VARCHAR(16) NOT NULL,
-    headsign        TEXT,
-    vehicle_id      VARCHAR(32),
-    trip_start_at   TIMESTAMPTZ,
-    first_seen_at   TIMESTAMPTZ NOT NULL,
-    last_seen_at    TIMESTAMPTZ NOT NULL,
-    status          VARCHAR(12) NOT NULL CHECK (status IN ('running','finished','canceled')),
-    finished_by     VARCHAR(12) CHECK (finished_by IN ('after_track','timeout')),
-    last_delay      INTEGER,
-    max_delay       INTEGER,
-    max_delay_at    TIMESTAMPTZ,
-    max_delay_stop  VARCHAR(32),            -- GTFS stop_id
-    last_stop_seq   INTEGER,                -- poslední změřená zastávka
-    dep_total       INTEGER     NOT NULL DEFAULT 0,
-    dep_on_time     INTEGER     NOT NULL DEFAULT 0,
-    dep_early       INTEGER     NOT NULL DEFAULT 0,
-    dep_late        INTEGER     NOT NULL DEFAULT 0,
-    dep_late_sum    BIGINT      NOT NULL DEFAULT 0,
-    valid_snapshots INTEGER     NOT NULL DEFAULT 0,
-    flagged         BOOLEAN     NOT NULL DEFAULT false,   -- max_delay > ALERT_DELAY_S (ADR-0055)
-    verified        BOOLEAN     NOT NULL DEFAULT false,   -- správce potvrdil
-    excluded        BOOLEAN     NOT NULL DEFAULT false,   -- správce vyřadil z rekordmana
-    PRIMARY KEY (service_date, trip_id),
-    CHECK (dep_total = dep_on_time + dep_early + dep_late),
-    CHECK (dep_on_time >= 0 AND dep_early >= 0 AND dep_late >= 0 AND dep_late_sum >= 0)
-);
-CREATE INDEX idx_trips_route   ON trips_daily (service_date, route_id);
-CREATE INDEX idx_trips_running ON trips_daily (status) WHERE status = 'running';
-
--- Každý průjezd zastávkou. Základ pro „Moji trasu“.
-CREATE TABLE stop_events (
-    service_date  DATE        NOT NULL,
-    trip_id       VARCHAR(64) NOT NULL,
-    stop_seq      SMALLINT    NOT NULL,
-    route_id      VARCHAR(32) NOT NULL,
-    stop_id       VARCHAR(32) NOT NULL,
-    node_id       INTEGER     NOT NULL,      -- denormalizace pro rychlé hledání
-    planned_arr   TIMESTAMPTZ,
-    planned_dep   TIMESTAMPTZ,
-    arr_delay     INTEGER,                   -- s, NULL = nezměřeno
-    dep_delay     INTEGER,
-    PRIMARY KEY (service_date, trip_id, stop_seq)
-) PARTITION BY RANGE (service_date);
--- oddíly po měsících zakládá server dopředu, staré se mažou celé (DROP PARTITION)
-CREATE INDEX idx_events_lookup ON stop_events (route_id, node_id, service_date);
-
--- Měsíční souhrn pro detail linky a dlouhodobou historii (počítá se v noci)
-CREATE TABLE stop_route_hourly (
-    month         DATE        NOT NULL,      -- první den měsíce
-    route_id      VARCHAR(32) NOT NULL,
-    node_id       INTEGER     NOT NULL,
-    day_type      VARCHAR(16) NOT NULL,
-    hour          SMALLINT    NOT NULL,
-    dep_total     INTEGER     NOT NULL,
-    dep_on_time   INTEGER     NOT NULL,
-    dep_early     INTEGER     NOT NULL,
-    dep_late      INTEGER     NOT NULL,
-    dep_late_sum  BIGINT      NOT NULL,
-    max_delay     INTEGER     NOT NULL,
-    PRIMARY KEY (month, route_id, node_id, day_type, hour)
-);
-
-CREATE TABLE hourly_stats (
-    service_date    DATE        NOT NULL,
-    hour            SMALLINT    NOT NULL,   -- hodina plánovaného odjezdu, Europe/Prague
-    category        VARCHAR(16) NOT NULL,
-    dep_total       INTEGER     NOT NULL DEFAULT 0,
-    dep_on_time     INTEGER     NOT NULL DEFAULT 0,
-    dep_early       INTEGER     NOT NULL DEFAULT 0,
-    dep_late        INTEGER     NOT NULL DEFAULT 0,
-    dep_late_sum    BIGINT      NOT NULL DEFAULT 0,
-    PRIMARY KEY (service_date, hour, category)
-);
-
-CREATE TABLE daily_route_stats (
-    service_date   DATE        NOT NULL,
-    route_id       VARCHAR(32) NOT NULL,
-    trips_total    INTEGER     NOT NULL,
-    trips_finished INTEGER     NOT NULL,
-    trips_canceled INTEGER     NOT NULL,
-    dep_total      INTEGER     NOT NULL DEFAULT 0,
-    dep_on_time    INTEGER     NOT NULL DEFAULT 0,
-    dep_early      INTEGER     NOT NULL DEFAULT 0,
-    dep_late       INTEGER     NOT NULL DEFAULT 0,
-    dep_late_sum   BIGINT      NOT NULL DEFAULT 0,
-    sum_max_delay  BIGINT      NOT NULL DEFAULT 0,   -- COALESCE při výpočtu
-    max_delay      INTEGER     NOT NULL DEFAULT 0,
-    PRIMARY KEY (service_date, route_id)
-);
-
-CREATE TABLE daily_network_stats (
-    service_date      DATE        NOT NULL,
-    category          VARCHAR(16) NOT NULL,
-    trips_total       INTEGER     NOT NULL,
-    trips_finished    INTEGER     NOT NULL,
-    trips_canceled    INTEGER     NOT NULL,
-    dep_total         INTEGER     NOT NULL DEFAULT 0,
-    dep_on_time       INTEGER     NOT NULL DEFAULT 0,
-    dep_early         INTEGER     NOT NULL DEFAULT 0,
-    dep_late          INTEGER     NOT NULL DEFAULT 0,
-    dep_late_sum      BIGINT      NOT NULL DEFAULT 0,
-    sum_max_delay     BIGINT      NOT NULL DEFAULT 0,
-    PRIMARY KEY (service_date, category)
-);
-
-CREATE TABLE ingest_runs (
-    id              BIGSERIAL   PRIMARY KEY,
-    started_at      TIMESTAMPTZ NOT NULL,
-    finished_at     TIMESTAMPTZ,
-    ok              BOOLEAN     NOT NULL,
-    vehicles        INTEGER,
-    valid_snapshots INTEGER,
-    error           TEXT
-);
-CREATE INDEX idx_ingest_started ON ingest_runs (started_at);
-```
+Do `trips_daily` se zapisují jen spoje, které už vyjely nebo byly zrušeny (spoj jen ve stavu `before_track` zůstává v paměti).
+Spoj se zapíše, když se změní stav, uzavře zastávka nebo vozidlo; pouhé „viděn znovu“ zápis nevyvolá (FR-13).
+`verified` a `excluded` nastavuje správce, UPSERT sběru je nepřepisuje.
 
 ## API
 
@@ -239,6 +83,48 @@ Všechny odpovědi obsahují `generated_at` a `data_as_of`. Cache: `public, s-ma
 | `MIN_TRIPS` | 20 | Minimum spojů pro žebříčky |
 | `RAW_ARCHIVE` | false | Ukládat surové snímky (ADR-0018) |
 | `CORS_ORIGIN` | — | Doména frontendu |
+
+## Struktura serveru
+
+```
+server/
+  build.gradle.kts                    Gradle (Kotlin DSL), Quarkus, jOOQ codegen z migrací
+  src/main/kotlin/cz/zasstojime/
+    Bootstrap.kt                      start: oddíly → kalendář → jízdní řád → obnova stavu → sběr
+    golemio/                          HTTP klient Golemia, parser snímku
+    gtfs/                             import PID GTFS, kategorie, kalendář se svátky
+    ingest/                           TripProcessor (stavový automat, kap. 4 spec), cyklus sběru, zápis do DB
+    persistence/                      jOOQ, oddíly stop_events, metrika velikosti DB
+    api/                              /api/health
+  src/main/resources/db/migration/    Flyway
+  src/test/resources/replay/          30 min reálných snímků + výřez GTFS (AC-05)
+  tools/make_replay_fixture.py        tvorba fixture ze záznamu
+```
+
+| Endpoint | Obsah |
+|---|---|
+| `/api/health` | Stav sběru (FR-33) |
+| `/q/openapi` | OpenAPI (FR-34) |
+| `/q/metrics` | Prometheus (NFR-09) |
+
+Metriky: `ingest_cycle_seconds`, `ingest_cycles_total{result}`, `ingest_vehicles`, `ingest_stop_events_total`,
+`ingest_snapshots_skipped_total{reason}` (vč. `duplicate_vehicle` = ignorovaná vozidla), `ingest_departures_dropped_total{reason}`,
+`golemio_errors_total{kind}`, `ingest_data_age_seconds`, `trips_running`, `flagged_trips`, `gtfs_import_last_success_seconds`,
+`gtfs_import_failures_total`, `gtfs_unknown_routes_total`, `db_size_bytes`.
+
+## Vývoj
+
+```
+cd server
+./gradlew test          # jednotkové testy + integrační proti PostgreSQL (Dev Services, potřebuje Docker)
+./gradlew quarkusDev    # dev režim; Postgres spustí Dev Services, GOLEMIO_API_KEY z prostředí
+./gradlew build         # build/quarkus-app pro Docker obraz
+```
+
+Po vědomé změně metodiky se snapshot přehrání aktualizuje `UPDATE_SNAPSHOTS=1 ./gradlew test --tests '*ReplayTest'`
+a diff `src/test/resources/replay/expected-summary.txt` se zkontroluje v review.
+
+Nasazení: `cp .env.example .env` (vyplnit), `cd server && ./gradlew build && cd .. && docker compose up -d --build`.
 
 ## Kvalita a provoz
 
