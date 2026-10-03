@@ -12,6 +12,9 @@ import jakarta.ws.rs.core.MediaType
 import jakarta.ws.rs.core.Response
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import org.eclipse.microprofile.openapi.annotations.media.Content
+import org.eclipse.microprofile.openapi.annotations.media.Schema
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponse
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -55,6 +58,7 @@ data class DepartureLookupResponse(
 @Produces(MediaType.APPLICATION_JSON)
 class LinesResource(private val routes: RouteRepository, private val ingest: IngestService) {
     @GET
+    @APIResponse(responseCode = "200", content = [Content(schema = Schema(implementation = LineLookupResponse::class))])
     fun lines(@QueryParam("q") query: String?): Response {
         val q = query?.trim() ?: ""
         if (q.length > 16) throw BadRequestException("Dotaz na linku je příliš dlouhý")
@@ -64,6 +68,7 @@ class LinesResource(private val routes: RouteRepository, private val ingest: Ing
 
     @GET
     @Path("{line}/stops")
+    @APIResponse(responseCode = "200", content = [Content(schema = Schema(implementation = StopLookupResponse::class))])
     fun stops(@PathParam("line") line: String): Response = routeCached(StopLookupResponse(
         Instant.now().toString(), ingest.lastSuccessAt?.toString(), false,
         routes.stops(line).map { StopDto(it.nodeId, it.name, it.headsign, it.sequence) },
@@ -71,6 +76,7 @@ class LinesResource(private val routes: RouteRepository, private val ingest: Ing
 
     @GET
     @Path("{line}/departures")
+    @APIResponse(responseCode = "200", content = [Content(schema = Schema(implementation = DepartureLookupResponse::class))])
     fun departures(@PathParam("line") line: String, @QueryParam("from") from: Int?,
                    @QueryParam("day_type") dayType: String?): Response {
         if (from == null || dayType !in DAY_TYPES) throw BadRequestException("Vyberte uzel a typ dne")
@@ -123,6 +129,7 @@ data class MyRouteResponse(
 @Produces(MediaType.APPLICATION_JSON)
 class MyRouteResource(private val routes: RouteRepository, private val ingest: IngestService) {
     @GET
+    @APIResponse(responseCode = "200", content = [Content(schema = Schema(implementation = MyRouteResponse::class))])
     fun route(@QueryParam("line") line: String?, @QueryParam("from") from: Int?,
               @QueryParam("to") to: Int?, @QueryParam("time") time: String?,
               @QueryParam("day_type") dayType: String?, @QueryParam("period") period: String?): Response {

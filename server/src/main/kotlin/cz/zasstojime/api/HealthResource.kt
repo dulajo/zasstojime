@@ -10,6 +10,9 @@ import jakarta.ws.rs.core.MediaType
 import jakarta.ws.rs.core.Response
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import org.eclipse.microprofile.openapi.annotations.media.Content
+import org.eclipse.microprofile.openapi.annotations.media.Schema
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponse
 import java.time.Duration
 import java.time.Instant
 
@@ -35,6 +38,8 @@ class HealthResource(
 ) {
     @GET
     @Produces(MediaType.APPLICATION_JSON)
+    @APIResponse(responseCode = "200", content = [Content(schema = Schema(implementation = HealthResponse::class))])
+    @APIResponse(responseCode = "503", content = [Content(schema = Schema(implementation = HealthResponse::class))])
     fun health(): Response {
         val now = Instant.now()
         val last = ingest.lastSuccessAt
