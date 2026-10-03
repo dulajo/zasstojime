@@ -16,6 +16,9 @@ import jakarta.ws.rs.core.MediaType
 import jakarta.ws.rs.core.Response
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import org.eclipse.microprofile.openapi.annotations.media.Content
+import org.eclipse.microprofile.openapi.annotations.media.Schema
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponse
 import java.time.Instant
 import java.time.LocalDate
 import java.time.format.DateTimeParseException
@@ -122,6 +125,7 @@ class DayResource(
 ) {
     @GET
     @Path("{date}")
+    @APIResponse(responseCode = "200", content = [Content(schema = Schema(implementation = DayResponse::class))])
     fun day(@PathParam("date") raw: String): Response {
         val date = parseDate(raw)
         val snapshot = load(date) ?: return Response.status(404).build()
@@ -135,6 +139,7 @@ class DayResource(
 
     @GET
     @Path("{date}/leaderboard")
+    @APIResponse(responseCode = "200", content = [Content(schema = Schema(implementation = LeaderboardResponse::class))])
     fun leaderboard(@PathParam("date") raw: String): Response {
         val date = parseDate(raw)
         val snapshot = load(date) ?: return Response.status(404).build()
@@ -151,6 +156,7 @@ class DayResource(
 
     @GET
     @Path("{date}/record")
+    @APIResponse(responseCode = "200", content = [Content(schema = Schema(implementation = RecordResponse::class))])
     fun record(@PathParam("date") raw: String): Response {
         val date = parseDate(raw)
         val snapshot = load(date) ?: return Response.status(404).build()
@@ -162,6 +168,7 @@ class DayResource(
 
     @GET
     @Path("{date}/hourly")
+    @APIResponse(responseCode = "200", content = [Content(schema = Schema(implementation = HourlyResponse::class))])
     fun hourly(@PathParam("date") raw: String): Response {
         val date = parseDate(raw)
         val snapshot = load(date) ?: return Response.status(404).build()
