@@ -113,6 +113,29 @@ Spoj bez jediného změřeného odjezdu se nepočítá.
 
 Noční linka (`is_night`) a náhradní doprava (`is_substitute_transport`) jsou příznaky, ne kategorie.
 
+## Typ dne
+
+| Typ | Dny |
+|---|---|
+| `workday` | Po–Pá, kromě státních svátků |
+| `saturday` | Sobota, kromě státních svátků |
+| `sunday_holiday` | Neděle a státní svátky |
+
+## Moje trasa
+
+Uživatel zvolí **linku, stanici nástupu, stanici výstupu, plánovaný čas odjezdu a typ dne**. Spoj se v každém dni dohledá podle linky, uzlu nástupu a plánovaného času, ne podle `trip_id` (#47). Jen přímé spoje.
+
+| Metrika | Výpočet (za zvolené období) |
+|---|---|
+| Měřeno | Počet dní, kdy byl spoj změřen v nástupní i výstupní stanici |
+| Včas na nástupu | Počet dní s odjezdem v toleranci (−59 až +179 s) / měřeno |
+| Průměrné čekání navíc | Průměr max(0, zpoždění odjezdu v A) |
+| Zpoždění v cíli | Průměr a maximum zpoždění příjezdu do B (když chybí, zpoždění odjezdu z B) |
+| Jízda navíc | Průměr (zpoždění v B − zpoždění v A) |
+| Celkem nasbíráno | Σ max(0, zpoždění v B) přes měřené dny |
+
+„Celkem nasbíráno“ se na webu uvádí jako „kdybys jel tímto spojem každý (pracovní) den“. Nevíme, kdy uživatel skutečně jel.
+
 ## Žebříčky
 
 | Žebříček | Výpočet | Podmínka |

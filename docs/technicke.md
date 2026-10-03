@@ -8,7 +8,7 @@
        ▼                          ▼
 [ Server (Quarkus) ] ─────▶ [ PostgreSQL ]
   ingest  – validace, stavový automat spoje, finalizace
-  gtfs    – import číselníku linek
+  gtfs    – import linek a zastávek
   aggregation – živá čísla v paměti; denní tabulky do DB každých 5 min
   api     – předpočítané JSON odpovědi
        │
@@ -38,14 +38,18 @@ Stav dnešních spojů drží server v paměti (včetně rozpracované zastávky
 
 Výchozí návrh. Po založení projektu se přesune do Flyway migrace `V1__init.sql`.
 
-| Tabulka | 1 řádek = | Retence |
-|---|---|---|
-| `routes` | linka z PID GTFS | přepis denně |
-| `trips_daily` | spoj × provozní den | 90 dní |
-| `hourly_stats` | den × hodina × kategorie | trvale |
-| `daily_route_stats` | den × linka | trvale |
-| `daily_network_stats` | den × kategorie (`all` = celá síť) | trvale |
-| `ingest_runs` | jeden běh sběru | 30 dní |
+| Tabulka | 1 řádek = | Retence | Odhad velikosti |
+|---|---|---|---|
+| `routes` | linka z PID GTFS | přepis denně | ~900 řádků |
+| `stops` | zastávka / nástupiště z PID GTFS | přepis denně | ~20 tis. řádků |
+| `calendar_days` | den s typem (pracovní / sobota / neděle a svátek) | trvale | 365 řádků/rok |
+| `trips_daily` | spoj × provozní den | 13 měsíců | ~40 tis. řádků/den |
+| `stop_events` | průjezd spoje zastávkou | 13 měsíců, oddíly po měsících | ~0,5 mil. řádků/den, ~2 GB/měsíc |
+| `stop_route_hourly` | měsíc × linka × stanice × typ dne × hodina | trvale | malá |
+| `hourly_stats` | den × hodina × kategorie | trvale | malá |
+| `daily_route_stats` | den × linka | trvale | ~900 řádků/den |
+| `daily_network_stats` | den × kategorie (`all` = celá síť) | trvale | 7 řádků/den |
+| `ingest_runs` | jeden běh sběru | 13 měsíců (pokrytí dat pro „Moje trasa“) | ~2 900 řádků/den |
 
 ```sql
 CREATE TABLE routes (
@@ -56,6 +60,23 @@ CREATE TABLE routes (
     is_night      BOOLEAN     NOT NULL DEFAULT false,
     is_substitute BOOLEAN     NOT NULL DEFAULT false,
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE stops (
+    stop_id       VARCHAR(32) PRIMARY KEY,   -- nástupiště, např. U142V5S
+    name          TEXT        NOT NULL,
+    node_id       INTEGER,                   -- asw_node_id = stanice; NULL = technický bod
+    platform_code VARCHAR(8),
+    lat           DOUBLE PRECISION,
+    lon           DOUBLE PRECISION,
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_stops_node ON stops (node_id);
+
+CREATE TABLE calendar_days (
+    day           DATE        PRIMARY KEY,
+    day_type      VARCHAR(16) NOT NULL,      -- workday | saturday | sunday_holiday
+    holiday_name  TEXT
 );
 
 CREATE TABLE trips_daily (
@@ -86,6 +107,39 @@ CREATE TABLE trips_daily (
 );
 CREATE INDEX idx_trips_route   ON trips_daily (service_date, route_id);
 CREATE INDEX idx_trips_running ON trips_daily (status) WHERE status = 'running';
+
+-- Každý průjezd zastávkou. Základ pro „Moji trasu“.
+CREATE TABLE stop_events (
+    service_date  DATE        NOT NULL,
+    trip_id       VARCHAR(64) NOT NULL,
+    stop_seq      SMALLINT    NOT NULL,
+    route_id      VARCHAR(32) NOT NULL,
+    stop_id       VARCHAR(32) NOT NULL,
+    node_id       INTEGER     NOT NULL,      -- denormalizace pro rychlé hledání
+    planned_arr   TIMESTAMPTZ,
+    planned_dep   TIMESTAMPTZ,
+    arr_delay     INTEGER,                   -- s, NULL = nezměřeno
+    dep_delay     INTEGER,
+    PRIMARY KEY (service_date, trip_id, stop_seq)
+) PARTITION BY RANGE (service_date);
+-- oddíly po měsících zakládá server dopředu, staré se mažou celé (DROP PARTITION)
+CREATE INDEX idx_events_lookup ON stop_events (route_id, node_id, service_date);
+
+-- Měsíční souhrn pro detail linky a dlouhodobou historii (počítá se v noci)
+CREATE TABLE stop_route_hourly (
+    month         DATE        NOT NULL,      -- první den měsíce
+    route_id      VARCHAR(32) NOT NULL,
+    node_id       INTEGER     NOT NULL,
+    day_type      VARCHAR(16) NOT NULL,
+    hour          SMALLINT    NOT NULL,
+    dep_total     INTEGER     NOT NULL,
+    dep_on_time   INTEGER     NOT NULL,
+    dep_early     INTEGER     NOT NULL,
+    dep_late      INTEGER     NOT NULL,
+    dep_late_sum  BIGINT      NOT NULL,
+    max_delay     INTEGER     NOT NULL,
+    PRIMARY KEY (month, route_id, node_id, day_type, hour)
+);
 
 CREATE TABLE hourly_stats (
     service_date    DATE        NOT NULL,
@@ -147,6 +201,10 @@ Všechny odpovědi obsahují `generated_at` a `data_as_of`. Cache: `public, s-ma
 | `GET /api/day/{date}/leaderboard` | Žebříčky |
 | `GET /api/day/{date}/record` | Rekordman dne |
 | `GET /api/day/{date}/hourly` | Hodinový vývoj |
+| `GET /api/lines?q=` | Vyhledání linky |
+| `GET /api/lines/{line}/stops` | Stanice linky (uzly) v pořadí trasy |
+| `GET /api/lines/{line}/departures?from={node}&day_type=` | Plánované odjezdy ze stanice (z posledních 14 dní) |
+| `GET /api/my-route?line=&from=&to=&time=&day_type=&period=` | „Moje trasa“: metriky + jednotlivé dny |
 | `GET /api/health` | Poslední úspěšný běh, stáří dat; 503 při datech starších než 10 min |
 
 ## Konfigurace (proměnné prostředí)
@@ -171,6 +229,7 @@ Všechny odpovědi obsahují `generated_at` a `data_as_of`. Cache: `public, s-ma
 | Jednotkové testy | Stavový automat (včetně znovuotevření), měření odjezdů, přeskok zpět, nereálné skoky, půlnoc, změna času |
 | Integrační testy | Nahrané payloady z Fáze 0 → deterministické agregáty |
 | Zálohy | Denní `pg_dump` mimo homelab |
+| Noční úlohy | Souhrn `stop_route_hourly`, založení oddílu na další měsíc, mazání oddílů starších než 13 měsíců |
 
 ## Nasazení
 

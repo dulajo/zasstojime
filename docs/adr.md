@@ -32,6 +32,12 @@ Jeden řádek = jedno rozhodnutí. Detaily výpočtů jsou v [metodika.md](metod
 | 41 | Zpoždění odjezdu = poslední hodnota pro zastávku před posunem na další | Na zastávce se hodnota průběžně mění, ustálí se až po odjezdu | První zachycená hodnota | ✅ |
 | 42 | `after_track` spoj ukončí, ale pokud se do 15 min objeví znovu jedoucí, spoj se znovu otevře | Záznam: 41 z 2 499 spojů se po `after_track` vrátilo na trasu | Ukončit natvrdo | ✅ |
 | 43 | Sběr dat se spustí až s hotovým pohonem, žádný dočasný archivátor předem | Jednodušší; historie začne dnem spuštění | Archivovat surové snímky už teď a později je přehrát | ✅ |
+| 44 | Ukládat každý průjezd zastávkou (`stop_events`): plánovaný čas, zpoždění při příjezdu i odjezdu; 13 měsíců | Potřebné pro „Moji trasu“ a roční přehled; odhad ~2 GB/měsíc | Jen souhrny za spoj | ✅ |
+| 45 | Zastávky seskupovat podle uzlu (`asw_node_id`), ne podle nástupiště; technické body (`T…`, bez uzlu) ignorovat | Vlak jede den ode dne z jiné koleje; uživatel volí stanici, ne kolej | Podle `stop_id` | ✅ |
+| 46 | Typ dne (pracovní den / sobota / neděle a svátek) z vlastní tabulky s českými svátky | „Můj vlak ve všední den“ nesmí započítat svátek | Jen den v týdnu | ✅ |
+| 47 | „Moje trasa“ jen pro přímé spoje; spoj se hledá podle linky, uzlu nástupu, plánovaného času a typu dne, ne podle `trip_id` | `trip_id` se mění se změnou jízdního řádu (14. 12.) | Přestupy (později); hledání podle `trip_id` | ✅ |
+| 48 | Bez uživatelských účtů: trasa je uložená v URL | Žádná osobní data, nulový práh, odkaz se dá sdílet | Registrace, ukládání na serveru | ✅ |
+| 49 | Fázi 1 nasadit po částech: nejdřív sběr do DB, pak agregace a API | Historie začíná dnem spuštění sběru (#43) | Nasadit až celý pohon | ✅ |
 
 ## Architektura
 

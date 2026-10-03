@@ -18,9 +18,10 @@ Zdroj dat: [Golemio](https://golemio.cz), licence CC BY 4.0. Projekt není ofici
 
 | Fáze | Obsah | Stav |
 |---|---|---|
-| 0 – Ověření dat | API klíč, nahrát 2–3 h payloadů, porovnat zdroje (GeoJSON / lehčí endpoint / GTFS-RT), ověřit body 🔍 | ⏳ (probíhá) |
-| 1 – Pohon | GTFS import, sběr, stavový automat spoje, agregace, API, monitoring, testy | — |
-| 2 – Dashboard | Web: hlavní metriky, semafor, žebříčky, rekordman, metodika, OG obrázky | — |
+| 0 – Ověření dat | API klíč, záznam dat, porovnání zdrojů, ověření metodiky | ✅ (zbývá ranní špička, metro) |
+| 1a – Sběr | GTFS import, sběr, stavový automat spoje, `stop_events`, monitoring, nasazení do homelabu **co nejdřív** (historie začíná spuštěním) | — |
+| 1b – Výpočty a API | Agregace, žebříčky, „Moje trasa“, API | — |
+| 2 – Web | Dashboard (metriky, semafor, žebříčky, rekordman), **Moje trasa** (od ~1 měsíce dat), metodika, OG obrázky | — |
 | 3 – Rozšíření | Grafy během dne, detail linky, historie | — |
 | Později | Přepočty zpoždění na srozumitelné jednotky času (na webu občas i pivní vtip, na sítích ne); příspěvky na sociální sítě se schvalováním a monetizace | — |
 
