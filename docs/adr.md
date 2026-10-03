@@ -31,6 +31,7 @@ Jeden řádek = jedno rozhodnutí. Detaily výpočtů jsou v [metodika.md](metod
 | 40 | Snapshot, kde `last_stop.sequence` klesne, je neplatný | Všechny velké skoky v záznamu byly přeskoky zpět na trase (chybné spárování) | — | ✅ |
 | 41 | Zpoždění odjezdu = poslední hodnota pro zastávku před posunem na další | Na zastávce se hodnota průběžně mění, ustálí se až po odjezdu | První zachycená hodnota | ✅ |
 | 42 | `after_track` spoj ukončí, ale pokud se do 15 min objeví znovu jedoucí, spoj se znovu otevře | Záznam: 41 z 2 499 spojů se po `after_track` vrátilo na trasu | Ukončit natvrdo | ✅ |
+| 43 | Sběr dat se spustí až s hotovým pohonem, žádný dočasný archivátor předem | Jednodušší; historie začne dnem spuštění | Archivovat surové snímky už teď a později je přehrát | ✅ |
 
 ## Architektura
 
