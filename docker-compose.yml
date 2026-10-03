@@ -1,0 +1,36 @@
+# Homelab: server + PostgreSQL (docs/technicke.md – Nasazení).
+# Před `docker compose up --build` spusť v server/ `./gradlew build`.
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: zasstojime
+      POSTGRES_USER: zasstojime
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?Nastav DATABASE_PASSWORD v .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zasstojime -d zasstojime"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  server:
+    build:
+      context: ./server
+      dockerfile: src/main/docker/Dockerfile.jvm
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      DATABASE_URL: jdbc:postgresql://db:5432/zasstojime
+      DATABASE_USER: zasstojime
+    ports:
+      # API a /q/metrics jen lokálně; ven přes Cloudflare Tunnel (ADR-0026)
+      - "127.0.0.1:8080:8080"
+
+volumes:
+  pgdata:

@@ -153,6 +153,16 @@ plausible(trip, p):
 
 Pozn.: první zastávka spoje má jen odjezd, konečná jen příjezd. Obojí se ukládá.
 
+Upřesnění z implementace (`TripProcessor`):
+
+- `close_pending(trip, f, terminus = true)`: když `f.last_stop.sequence` > `trip.max_seq`, uzavře se nejdřív rozpracovaná zastávka
+  a konečná se založí jako nová; konečná dostane příjezd z `f.delay.last_stop_arrival` a odjezd se zahodí.
+- `origin_timestamp` pro uzavření mimo platný snímek: u dojetí a zrušení novější z `f.origin_timestamp` a `trip.last_origin_ts`,
+  u timeoutu `trip.last_origin_ts`.
+- Vozidla se seskupují podle `(service_date, trip_id)`: totéž `trip_id` jezdí každý den, ráno může být ve feedu včerejší
+  dojetý spoj i dnešní před výjezdem.
+- Spoj se zapisuje do DB, jen když se změní stav, uzavře zastávka nebo vozidlo (FR-13); spoj jen ve stavu `new` se nezapisuje.
+
 ## 5. Okrajové případy
 
 | Případ | Chování | ADR / FR |
