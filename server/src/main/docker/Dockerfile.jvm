@@ -1,0 +1,16 @@
+# Obraz z výstupu `./gradlew build` (build/quarkus-app).
+FROM eclipse-temurin:21-jre-alpine
+
+ENV LANG=C.UTF-8 TZ=Europe/Prague
+RUN addgroup -S app && adduser -S app -G app
+WORKDIR /app
+
+COPY --chown=app:app build/quarkus-app/lib/ /app/lib/
+COPY --chown=app:app build/quarkus-app/*.jar /app/
+COPY --chown=app:app build/quarkus-app/app/ /app/app/
+COPY --chown=app:app build/quarkus-app/quarkus/ /app/quarkus/
+
+USER app
+EXPOSE 8080
+ENV JAVA_OPTS="-XX:MaxRAMPercentage=75 -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8"
+ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar /app/quarkus-run.jar"]

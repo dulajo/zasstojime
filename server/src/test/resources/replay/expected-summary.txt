@@ -1,0 +1,26 @@
+snímků: 61
+vozidel celkem: 153642
+platných snímků spojů: 39296
+průjezdů: 14455 (s odjezdem 11648, s příjezdem 14013)
+spojů: running 885, finished/after_track 716, finished/timeout 32, canceled 0
+
+kategorie       odjezdů    včas  předjetí  zpožděno  index
+metro               571     571         0         0 100.00
+tram               1754    1640         0       114  93.50
+bus_city           5557    5132         7       418  92.35
+bus_regional       2906    1987        21       898  68.38
+train               623     335         6       282  53.77
+other               237     203         0        34  85.65
+all               11648    9868        34      1746  84.72
+
+top 5 max_delay:
+  2026-10-03 404_296_251214 linka 404: 4410 s na U32198Z1
+  2026-10-03 1124_1232_260601 linka R24: 2700 s na U2908Z301
+  2026-10-03 402_560_260926 linka 402: 1609 s na U7512Z2
+  2026-10-03 2805_1020_260919 linka 805: 1507 s na U9425Z2
+  2026-10-03 1121_1143_261003 linka R21: 1440 s na U818Z301
+
+přeskočené snímky: {backward_seq=232, old_origin=12614, stale_origin=4}
+zahozené průjezdy: {implausible_jump=21, technical_stop=213}
+neznámé linky: 0
+pásma odjezdů: {EARLY=34, ON_TIME=9868, LATE=1746}
