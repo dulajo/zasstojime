@@ -9,7 +9,8 @@ Zdroj dat: [Golemio](https://golemio.cz), licence CC BY 4.0. Projekt není ofici
 
 | Dokument | Obsah |
 |---|---|
-| [docs/adr.md](docs/adr.md) | Rozhodnutí: co, proč a co jsme zamítli |
+| [docs/spec.md](docs/spec.md) | **Specifikace Fáze 1: vstupní bod** (požadavky, algoritmus, akceptační kritéria) |
+| [docs/adr/](docs/adr/README.md) | Rozhodnutí (ADR), každé v samostatném souboru |
 | [docs/metodika.md](docs/metodika.md) | Jak se počítá každé číslo |
 | [docs/technicke.md](docs/technicke.md) | Architektura, datový model, API, konfigurace, nasazení |
 | [docs/faze0.md](docs/faze0.md) | Zjištění z reálných dat |

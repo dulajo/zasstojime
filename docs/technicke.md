@@ -46,7 +46,7 @@ Výchozí návrh. Po založení projektu se přesune do Flyway migrace `V1__init
 | `trips_daily` | spoj × provozní den | 13 měsíců | ~40 tis. řádků/den |
 | `stop_events` | průjezd spoje zastávkou | 13 měsíců, oddíly po měsících | ~0,5 mil. řádků/den, ~2 GB/měsíc |
 | `stop_route_hourly` | měsíc × linka × stanice × typ dne × hodina | trvale | malá |
-| `hourly_stats` | den × hodina × kategorie | trvale | malá |
+| `hourly_stats` | den × hodina odjezdu × kategorie | trvale | malá |
 | `daily_route_stats` | den × linka | trvale | ~900 řádků/den |
 | `daily_network_stats` | den × kategorie (`all` = celá síť) | trvale | 7 řádků/den |
 | `ingest_runs` | jeden běh sběru | 13 měsíců (pokrytí dat pro „Moje trasa“) | ~2 900 řádků/den |
@@ -143,11 +143,13 @@ CREATE TABLE stop_route_hourly (
 
 CREATE TABLE hourly_stats (
     service_date    DATE        NOT NULL,
-    hour            SMALLINT    NOT NULL,   -- 0–23, Europe/Prague
+    hour            SMALLINT    NOT NULL,   -- hodina plánovaného odjezdu, Europe/Prague
     category        VARCHAR(16) NOT NULL,
-    samples         INTEGER     NOT NULL,   -- vozidlo × cyklus
-    delayed_samples INTEGER     NOT NULL,   -- z toho delay ≥ 180
-    sum_delay       BIGINT      NOT NULL,
+    dep_total       INTEGER     NOT NULL DEFAULT 0,
+    dep_on_time     INTEGER     NOT NULL DEFAULT 0,
+    dep_early       INTEGER     NOT NULL DEFAULT 0,
+    dep_late        INTEGER     NOT NULL DEFAULT 0,
+    dep_late_sum    BIGINT      NOT NULL DEFAULT 0,
     PRIMARY KEY (service_date, hour, category)
 );
 
@@ -160,6 +162,8 @@ CREATE TABLE daily_route_stats (
     dep_total      INTEGER     NOT NULL DEFAULT 0,
     dep_on_time    INTEGER     NOT NULL DEFAULT 0,
     dep_early      INTEGER     NOT NULL DEFAULT 0,
+    dep_late       INTEGER     NOT NULL DEFAULT 0,
+    dep_late_sum   BIGINT      NOT NULL DEFAULT 0,
     sum_max_delay  BIGINT      NOT NULL DEFAULT 0,   -- COALESCE při výpočtu
     max_delay      INTEGER     NOT NULL DEFAULT 0,
     PRIMARY KEY (service_date, route_id)
@@ -219,6 +223,8 @@ Všechny odpovědi obsahují `generated_at` a `data_as_of`. Cache: `public, s-ma
 | `ALERT_DELAY_S` | 7200 | Zpoždění, o kterém se pošle upozornění správci |
 | `DAILY_FLUSH_S` | 300 | Interval zápisu denních tabulek do DB |
 | `MIN_TRIPS` | 20 | Minimum spojů pro žebříčky |
+| `RAW_ARCHIVE` | false | Ukládat surové snímky (ADR-0018) |
+| `CORS_ORIGIN` | — | Doména frontendu |
 
 ## Kvalita a provoz
 
