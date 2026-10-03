@@ -21,7 +21,7 @@ Každý odjezd ze zastávky je jedno měření. Index dochvilnosti = odjezdy v t
 
 ## Důsledky
 
-- Záznam 2 h: 46 430 odjezdů, nezachyceno 1,3 % zastávek.
+- Záznam 2 h: 42 689 změřených odjezdů. 1,3 % zastávek vozidlo projede mezi snímky; u dalších 15,9 % je vozidlo zachyceno jen stojící a zpoždění odjezdu chybí (viz ADR-0053).
 - Index je srovnatelný s praxí dopravců.
 
 ## Podklady

@@ -19,7 +19,7 @@ Každé rozhodnutí má vlastní soubor: kontext, rozhodnutí, alternativy, důs
 | ADR | Rozhodnutí | Stav |
 |---|---|---|
 | [0003](0003-klic-spoje.md) | Spoj = provozní den + trip_id | ✅ |
-| [0004](0004-provozni-den.md) | Provozní den = datum výjezdu spoje | ✅ |
+| [0004](0004-provozni-den.md) | Provozní den = datum výjezdu spoje | ⛔ Nahrazeno ADR-0050 |
 | [0005](0005-potvrzene-maximum.md) | Maximum zpoždění platné po 3 snímcích | ⛔ Nahrazeno ADR-0039 |
 | [0006](0006-index-z-konecne.md) | Index dochvilnosti ze zpoždění na konečné | ⛔ Nahrazeno ADR-0033 |
 | [0007](0007-hranice-vcas.md) | Hranice „včas“ = zpoždění pod 180 s | ✅ |
@@ -38,6 +38,12 @@ Každé rozhodnutí má vlastní soubor: kontext, rozhodnutí, alternativy, důs
 | [0042](0042-znovuotevreni.md) | Dojetý spoj se může znovu otevřít | ✅ |
 | [0046](0046-typ-dne.md) | Typ dne s českými svátky | ✅ |
 | [0047](0047-moje-trasa.md) | Moje trasa: přímé spoje, hledání podle plánovaného času | ✅ |
+| [0050](0050-servisni-den-gtfs.md) | Provozní den = servisní den podle PID jízdního řádu | ✅ nahrazuje ADR-0004 |
+| [0051](0051-limit-poklesu.md) | Symetrický limit: zpoždění nesmí ani nereálně klesnout | ✅ |
+| [0052](0052-vic-vozidel-na-spoji.md) | Více vozidel na jednom spoji: vybrat to, které navazuje na průběh | ✅ |
+| [0053](0053-prijezd-misto-odjezdu.md) | Chybějící odjezd v „Moje trasa“ nahradit příjezdem | ✅ |
+| [0054](0054-odjezdy-zrusenych.md) | Odjezdy změřené před zrušením spoje se počítají | ✅ |
+| [0055](0055-rekordman-neovereno.md) | Rekordman nad 2 h má příznak „neověřeno“ | ✅ |
 
 ## Komunikace
 

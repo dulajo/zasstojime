@@ -64,16 +64,23 @@ Celkem 15,6 % vozidel ≥ 180 s, 1,3 % jede napřed (≤ −60 s).
 
 | Otázka | Zjištění | Dopad |
 |---|---|---|
-| Funguje měření odjezdů? | 46 430 odjezdů; nezachyceno 1,3 % zastávek (projeté mezi snímky) | ✅ #33 |
+| Funguje měření odjezdů? | 42 689 změřených odjezdů. 1,3 % zastávek vozidlo projede mezi snímky; u dalších 15,9 % je zachyceno jen stojící a zpoždění odjezdu chybí (u 98,7 % z nich je známý příjezd) | ✅ ADR-0033, ADR-0053 |
 | Ustálí se hodnota odjezdu? | Na zastávce se mění (9 122 zastávek), po odjezdu stabilní (výjimek 220) | Brát poslední hodnotu před posunem (#41) |
 | Jak spoje končí? | Z 3 609 jedoucích: 2 499 → `after_track`, 474 zmizelo bez něj (13 %) | Timeout nutný |
 | Je `after_track` definitivní? | 41 spojů se pak vrátilo na trasu | Znovuotevření (#42) |
 | Zrušené spoje | 6, z toho 1 zrušen až za jízdy | — |
 | Skoky v `actual` | Ze 137 tis. dvojic snímků: 99,9 % roste ≤ 60 s nad uplynulý čas; 42 skoků > 120 s, **všechny s přeskokem zpět na trase** | Tolerance 120 s sedí; přeskok zpět = neplatný (#40) |
 | `actual` vs. odjezdy | Max z `actual` (i se 3 snapshoty) je u 19 spojů o > 10 min vyšší než max z odjezdů; falešní „rekordmani“ 78, 35 a 34 min | Vše počítat z odjezdů (#39) |
-| Metro | 7 263 vzorků, max 66 s, odjezdy 100 % včas | Stále nejasné (#13) |
+| Metro | 7 263 vzorků, max 66 s, odjezdy 100 % včas | Stále nejasné (ADR-0013) |
+| Dvě vozidla na spoji | 5 spojů, vozidla na různých místech trasy (sekvence 9 a 1) | Chybné přiřazení, ne soupravy (ADR-0052) |
+| Dlouhé přeskoky zpět | 17 běhů ≥ 10 snímků; vozidlo jede trasu pozpátku (7 → 6 → … → 2) | Vozidlo opačného směru, ignorovat (ADR-0040) |
+| Nereálný pokles zpoždění | 8 z 19 346 poklesů > uplynulý čas + 120 s | ADR-0051 |
+| Příjezd vs. odjezd | Stejné pásmo v 94,8 %, odjezd typicky o 24 s později | ADR-0053 |
+| Výjezdy ≥ 24:00 v GTFS | 1 422 z 87 651 spojů | ADR-0050 |
 
 ### Index dochvilnosti z odjezdů (večer, mimo špičku)
+
+(První průchod analýzy, který bral i první zachycenou hodnotu odjezdu. Přesná pravidla ADR-0041 dají 42 689 odjezdů; poměry se liší v desetinách procenta.)
 
 | Typ | Odjezdů | Včas | Předjetí |
 |---|---|---|---|
