@@ -32,7 +32,7 @@ Podrobnosti v [docs/technicke.md – Vývoj](docs/technicke.md#vývoj).
 |---|---|---|
 | 0 – Ověření dat | API klíč, záznam dat, porovnání zdrojů, ověření metodiky | ✅ (zbývá ranní špička, metro) |
 | 1a – Sběr | GTFS import, sběr, stavový automat spoje, `stop_events`, monitoring, nasazení do homelabu **co nejdřív** (historie začíná spuštěním) | 🚧 implementováno, čeká na nasazení (AC-07, AC-08) |
-| 1b – Výpočty a API | Agregace, žebříčky, „Moje trasa“, API | — |
+| 1b – Výpočty a API | Agregace, žebříčky, „Moje trasa“, API | 🚧 implementováno; čeká na provozní ověření a ladění výkonu |
 | 2 – Web | Dashboard (metriky, semafor, žebříčky, rekordman), **Moje trasa** (od ~1 měsíce dat), metodika, OG obrázky | — |
 | 3 – Rozšíření | Grafy během dne, detail linky, historie | — |
 | Později | Přepočty zpoždění na srozumitelné jednotky času (na webu občas i pivní vtip, na sítích ne); příspěvky na sociální sítě se schvalováním a monetizace | — |
