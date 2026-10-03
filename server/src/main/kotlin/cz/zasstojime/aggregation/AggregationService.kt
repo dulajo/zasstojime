@@ -44,7 +44,7 @@ class AggregationService(
     }
 
     /** Yesterday's service day is closed after overnight trips have ended. */
-    @Scheduled(cron = "0 10 6 * * ?", timeZone = "Europe/Prague", skipExecutionIf = JobsDisabled::class)
+    @Scheduled(cron = "0 0 6 * * ?", timeZone = "Europe/Prague", skipExecutionIf = JobsDisabled::class)
     fun closeYesterday() {
         val yesterday = LocalDate.now(PragueTime.ZONE).minusDays(1)
         try {
