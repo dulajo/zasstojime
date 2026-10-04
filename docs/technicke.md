@@ -60,7 +60,7 @@ Všechny odpovědi obsahují `generated_at` a `data_as_of`. Cache: `public, s-ma
 | Endpoint | Obsah |
 |---|---|
 | `GET /api/day/{date\|today}` | Metriky sítě + rozpad podle kategorií |
-| `GET /api/day/{date}/leaderboard` | Žebříčky |
+| `GET /api/day/{date}/leaderboard` | Žebříčky; u linky i druh dopravy (`mode`: tram, bus, train, trolleybus, ferry, funicular) |
 | `GET /api/day/{date}/record` | Rekordman dne |
 | `GET /api/day/{date}/hourly` | Hodinový vývoj |
 | `GET /api/lines?q=` | Vyhledání linky |

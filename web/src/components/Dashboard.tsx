@@ -24,8 +24,19 @@ function Metric({ label, value, note, accent = false }: {
   </div>;
 }
 
-function Ranking({ title, subtitle, items, value }: {
-  title: string; subtitle: string; items: RouteRank[]; value: (item: RouteRank) => string;
+const modeNames: Record<string, string> = {
+  tram: "Tram", bus: "Bus", train: "Vlak", trolleybus: "Trolejbus", ferry: "Přívoz", funicular: "Lanovka", metro: "Metro",
+};
+
+function LineBadge({ item }: { item: RouteRank }) {
+  const mode = modeNames[item.mode] ? item.mode : "other";
+  return <span className={`line-badge line-${mode}`}>
+    <span className="line-mode">{modeNames[mode] ?? "Linka"}</span><span className="line-name">{item.line}</span>
+  </span>;
+}
+
+function Ranking({ title, subtitle, items, value, detail }: {
+  title: string; subtitle: string; items: RouteRank[]; value: (item: RouteRank) => string; detail: (item: RouteRank) => string;
 }) {
   return <section className="ranking-panel">
     <div className="panel-heading"><div><h3>{title}</h3><p>{subtitle}</p></div></div>
@@ -33,8 +44,8 @@ function Ranking({ title, subtitle, items, value }: {
       <ol className="ranking-list">{items.slice(0, 5).map((item, index) =>
         <li key={`${item.route_id}-${index}`}>
           <span className="rank-index">{String(index + 1).padStart(2, "0")}</span>
-          <span className="rank-line">{item.line}</span>
-          <span className="rank-value">{value(item)}</span>
+          <LineBadge item={item} />
+          <span className="rank-value"><b>{value(item)}</b><small>{detail(item)}</small></span>
         </li>)}</ol>}
   </section>;
 }
@@ -109,9 +120,15 @@ function Overview({ day, isToday, leaderboard, record }: {
       <div className="section-heading"><div><span className="section-kicker">Linky pod lupou</span><h2 id="rankings-title">Dnešní žebříčky</h2></div>
         <p>U průměrů a dochvilnosti zobrazujeme linky s alespoň 20 dokončenými spoji.</p></div>
       {leaderboard.data ? <div className="ranking-grid">
-        <Ranking title="Největší součet" subtitle="Zpoždění spojů na lince" items={leaderboard.data.most_total_delay} value={(item) => formatDuration(item.totals.sum_max_delay)} />
-        <Ranking title="Nejvíc na spoj" subtitle="Průměrné maximum spoje" items={leaderboard.data.highest_delay_per_trip} value={(item) => formatDuration(item.average_max_delay_s)} />
-        <Ranking title="Nejhorší dochvilnost" subtitle="Podíl odjezdů včas" items={leaderboard.data.worst_punctuality} value={(item) => formatPercent(item.totals.punctuality_pct)} />
+        <Ranking title="Nejvíc zpoždění celkem" subtitle="Sečtené největší zpoždění všech spojů linky. Linky s mnoha spoji mají přirozeně víc."
+          items={leaderboard.data.most_total_delay} value={(item) => formatDuration(item.totals.sum_max_delay)}
+          detail={(item) => `za ${formatNumber(item.totals.trips_total)} spojů`} />
+        <Ranking title="Nejvíc zpoždění na spoj" subtitle="Průměrné největší zpoždění jednoho spoje linky."
+          items={leaderboard.data.highest_delay_per_trip} value={(item) => formatMinutes(item.average_max_delay_s)}
+          detail={(item) => `průměr z ${formatNumber(item.totals.trips_total)} spojů`} />
+        <Ranking title="Nejhorší dochvilnost" subtitle="Podíl odjezdů ze zastávek, které byly včas."
+          items={leaderboard.data.worst_punctuality} value={(item) => formatPercent(item.totals.punctuality_pct)}
+          detail={(item) => `včas ${formatNumber(item.totals.dep_on_time)} z ${formatNumber(item.totals.dep_total)} odjezdů`} />
       </div> : <div className="empty-panel">{leaderboard.failed ? "Žebříčky se nepodařilo načíst." : "Načítáme žebříčky…"}</div>}
     </section>
 
