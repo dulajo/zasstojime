@@ -7,6 +7,8 @@ data class RouteInfo(
     val category: Category,
     val isNight: Boolean,
     val isSubstitute: Boolean,
+    /** GTFS `route_long_name`, např. „Praha - Milovice“. */
+    val longName: String? = null,
 )
 
 data class StopInfo(

@@ -22,19 +22,20 @@ class GtfsRepository(private val dsl: DSLContext) {
                 val batch = tx.batch(
                     tx.insertInto(
                         ROUTES, ROUTES.ROUTE_ID, ROUTES.SHORT_NAME, ROUTES.ROUTE_TYPE, ROUTES.CATEGORY,
-                        ROUTES.IS_NIGHT, ROUTES.IS_SUBSTITUTE, ROUTES.UPDATED_AT,
-                    ).values(null as String?, null, null, null, null, null, null)
+                        ROUTES.IS_NIGHT, ROUTES.IS_SUBSTITUTE, ROUTES.LONG_NAME, ROUTES.UPDATED_AT,
+                    ).values(null as String?, null, null, null, null, null, null, null)
                         .onConflict(ROUTES.ROUTE_ID).doUpdate()
                         .set(ROUTES.SHORT_NAME, DSL.excluded(ROUTES.SHORT_NAME))
                         .set(ROUTES.ROUTE_TYPE, DSL.excluded(ROUTES.ROUTE_TYPE))
                         .set(ROUTES.CATEGORY, DSL.excluded(ROUTES.CATEGORY))
                         .set(ROUTES.IS_NIGHT, DSL.excluded(ROUTES.IS_NIGHT))
                         .set(ROUTES.IS_SUBSTITUTE, DSL.excluded(ROUTES.IS_SUBSTITUTE))
+                        .set(ROUTES.LONG_NAME, DSL.excluded(ROUTES.LONG_NAME))
                         .set(ROUTES.UPDATED_AT, DSL.excluded(ROUTES.UPDATED_AT)),
                 )
                 val now = OffsetDateTime.now()
                 part.forEach {
-                    batch.bind(it.routeId, it.shortName, it.routeType.toShort(), it.category.db, it.isNight, it.isSubstitute, now)
+                    batch.bind(it.routeId, it.shortName, it.routeType.toShort(), it.category.db, it.isNight, it.isSubstitute, it.longName, now)
                 }
                 batch.execute()
             }
@@ -73,7 +74,7 @@ class GtfsRepository(private val dsl: DSLContext) {
     }
 
     fun loadRoutes(): List<RouteInfo> = dsl.selectFrom(ROUTES).fetch { r ->
-        RouteInfo(r.routeId, r.shortName, r.routeType.toInt(), Category.fromDb(r.category), r.isNight, r.isSubstitute)
+        RouteInfo(r.routeId, r.shortName, r.routeType.toInt(), Category.fromDb(r.category), r.isNight, r.isSubstitute, r.longName)
     }
 
     fun loadStops(): List<StopInfo> = dsl.selectFrom(STOPS).fetch { r ->

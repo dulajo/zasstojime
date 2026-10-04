@@ -505,6 +505,7 @@
           "line",
           "category",
           "mode",
+          "route_name",
           "route_id",
           "totals",
           "average_max_delay_s"
@@ -518,6 +519,12 @@
           },
           "mode": {
             "type": "string"
+          },
+          "route_name": {
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "route_id": {
             "type": "string"

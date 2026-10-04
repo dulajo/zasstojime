@@ -30,8 +30,12 @@ const modeNames: Record<string, string> = {
 
 function LineBadge({ item }: { item: RouteRank }) {
   const mode = modeNames[item.mode] ? item.mode : "other";
+  // GTFS odděluje zastávky trasy spojovníkem („Praha - Milovice“), na webu je pomlčka.
+  const route = item.route_name?.split(" - ").join(" – ");
   return <span className={`line-badge line-${mode}`}>
-    <span className="line-mode">{modeNames[mode] ?? "Linka"}</span><span className="line-name">{item.line}</span>
+    <span className="line-mode">{modeNames[mode] ?? "Linka"}</span>
+    <span className="line-text"><span className="line-name">{item.line}</span>
+      {route && <span className="line-route" title={route}>{route}</span>}</span>
   </span>;
 }
 
@@ -128,7 +132,7 @@ function Overview({ day, isToday, leaderboard, record }: {
           detail={(item) => `průměr z ${formatNumber(item.totals.trips_total)} spojů`} />
         <Ranking title="Nejhorší dochvilnost" subtitle="Podíl odjezdů ze zastávek, které byly včas."
           items={leaderboard.data.worst_punctuality} value={(item) => formatPercent(item.totals.punctuality_pct)}
-          detail={(item) => `včas ${formatNumber(item.totals.dep_on_time)} z ${formatNumber(item.totals.dep_total)} odjezdů`} />
+          detail={(item) => `${formatNumber(item.totals.dep_on_time)} z ${formatNumber(item.totals.dep_total)} odjezdů`} />
       </div> : <div className="empty-panel">{leaderboard.failed ? "Žebříčky se nepodařilo načíst." : "Načítáme žebříčky…"}</div>}
     </section>
 
