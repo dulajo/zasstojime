@@ -1,8 +1,9 @@
-# Homelab: server + PostgreSQL (docs/technicke.md – Nasazení).
+# Místní běh celé sestavy: server + PostgreSQL. V homelabu běží server jako systemd
+# služba v LXC se sdíleným PostgreSQL (ADR-0056, docs/provoz.md).
 # Před `docker compose up --build` spusť v server/ `./gradlew build`.
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     restart: unless-stopped
     environment:
       POSTGRES_DB: zasstojime
