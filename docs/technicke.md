@@ -130,7 +130,8 @@ cd server
 Po vědomé změně metodiky se snapshot přehrání aktualizuje `UPDATE_SNAPSHOTS=1 ./gradlew test --tests '*ReplayTest'`
 a diff `src/test/resources/replay/expected-summary.txt` se zkontroluje v review.
 
-Nasazení: `cp .env.example .env` (vyplnit), `cd server && ./gradlew build && cd .. && docker compose up -d --build`.
+Místní běh celé sestavy: `cp .env.example .env` (vyplnit), `cd server && ./gradlew build && cd .. && docker compose up -d --build`.
+Nasazení do homelabu: [provoz.md](provoz.md).
 
 ## Kvalita a provoz
 
@@ -153,11 +154,12 @@ Internet ─▶ Cloudflare (DNS, CDN) ─┬─▶ frontend (Cloudflare)
                                    └─▶ Cloudflare Tunnel
                                             │ odchozí spojení, žádný otevřený port
                                             ▼
-                     homelab: izolovaná VM/LXC (vlastní VLAN)
-                     Docker Compose: cloudflared + server + PostgreSQL
-                                            │
-                     správa jen přes WireGuard + NPM: Grafana, Prometheus, DB
+                     homelab (ADR-0056): LXC zasstojime, systemd: server (+ cloudflared)
+                            │ JDBC                        ▲ /q/metrics, logy (Alloy)
+                            ▼                             │
+                     CT 124 postgres-db             CT 119 observability
+                     sdílený PostgreSQL 17          Prometheus, Grafana, Loki → Telegram
 ```
 
-Postup nasazení, monitoring (`deploy/monitoring/`, profil `monitoring` v `docker-compose.yml`)
-a ověření AC-07/AC-08: [provoz.md](provoz.md).
+Postup nasazení, monitoring (`deploy/`, `deploy/observability/`) a ověření AC-07/AC-08:
+[provoz.md](provoz.md). `docker-compose.yml` slouží jen místnímu běhu celé sestavy.

@@ -57,7 +57,8 @@ Každé rozhodnutí má vlastní soubor: kontext, rozhodnutí, alternativy, důs
 |---|---|---|
 | [0014](0014-jedna-aplikace.md) | Server = jedna aplikace (sběr + API) | ✅ |
 | [0015](0015-trips-daily.md) | Hlavní tabulka na úrovni spoje: trips_daily | ✅ |
-| [0016](0016-postgresql.md) | Čistý PostgreSQL 16 | ✅ |
+| [0016](0016-postgresql.md) | Čistý PostgreSQL 16 | ⛔ Nahrazeno ADR-0057 |
+| [0057](0057-sdileny-postgresql.md) | Sdílený PostgreSQL 17 bez rozšíření | ✅ |
 | [0017](0017-predpocitane-odpovedi.md) | API vrací předpočítané odpovědi, CDN cache 30 s | ✅ |
 | [0018](0018-surove-snimky.md) | Surové snímky jako pojistka, retence 7 dní | ✅ |
 | [0037](0037-okno-v-pameti.md) | Klouzavé okno snímků jen v paměti | ⛔ Nahrazeno ADR-0039 |
@@ -79,7 +80,8 @@ Každé rozhodnutí má vlastní soubor: kontext, rozhodnutí, alternativy, důs
 
 | ADR | Rozhodnutí | Stav |
 |---|---|---|
-| [0025](0025-homelab.md) | Server v homelabu | ✅ |
+| [0025](0025-homelab.md) | Server v homelabu | ⛔ Nahrazeno ADR-0056 |
+| [0056](0056-stavajici-homelab.md) | Nasazení do stávající infrastruktury homelabu | ✅ |
 | [0026](0026-cloudflare-tunnel.md) | Veřejný přístup jen přes Cloudflare Tunnel | ✅ |
 | [0027](0027-frontend-cloudflare.md) | Frontend hostovaný na Cloudflare | ✅ |
 | [0028](0028-domena.md) | Nová .cz doména, DNS na Cloudflare | ✅ |
