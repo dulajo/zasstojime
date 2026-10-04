@@ -15,10 +15,11 @@ const totals = (trips: number, departures: number, onTime: number, sumDelay: num
 });
 
 const ranks: RouteRank[] = [
-  { line: "22", category: "tram", route_id: "demo-22", totals: totals(162, 1934, 1428, 19840), average_max_delay_s: 122 },
-  { line: "136", category: "bus_city", route_id: "demo-136", totals: totals(118, 1380, 952, 17410), average_max_delay_s: 148 },
-  { line: "S7", category: "train", route_id: "demo-s7", totals: totals(82, 574, 462, 14280), average_max_delay_s: 174 },
-  { line: "9", category: "tram", route_id: "demo-9", totals: totals(140, 1652, 1306, 12360), average_max_delay_s: 88 },
+  { line: "22", category: "tram", mode: "tram", route_name: "Bílá Hora - Nádraží Hostivař", route_id: "demo-22", totals: totals(162, 1934, 1428, 19840), average_max_delay_s: 122 },
+  { line: "136", category: "bus_city", mode: "bus", route_name: "Jižní Město - Sídliště Čakovice", route_id: "demo-136", totals: totals(118, 1380, 952, 17410), average_max_delay_s: 148 },
+  { line: "S7", category: "train", mode: "train", route_name: "Úvaly - Praha - Beroun", route_id: "demo-s7", totals: totals(82, 574, 462, 14280), average_max_delay_s: 174 },
+  { line: "9", category: "tram", mode: "tram", route_name: "Sídliště Řepy - Spojovací", route_id: "demo-9", totals: totals(140, 1652, 1306, 12360), average_max_delay_s: 88 },
+  { line: "P5", category: "other", mode: "ferry", route_name: null, route_id: "demo-p5", totals: totals(34, 102, 49, 2310), average_max_delay_s: 68 },
 ];
 
 export function demoData(date: string): { day: Day; leaderboard: Leaderboard; record: RecordDay } {
@@ -40,8 +41,8 @@ export function demoData(date: string): { day: Day; leaderboard: Leaderboard; re
     leaderboard: {
       ...common,
       most_total_delay: ranks,
-      highest_delay_per_trip: [ranks[2], ranks[1], ranks[0], ranks[3]],
-      worst_punctuality: [ranks[1], ranks[0], ranks[2], ranks[3]],
+      highest_delay_per_trip: [ranks[2], ranks[1], ranks[0], ranks[3], ranks[4]],
+      worst_punctuality: [ranks[4], ranks[1], ranks[0], ranks[3], ranks[2]],
     },
     record: {
       ...common,

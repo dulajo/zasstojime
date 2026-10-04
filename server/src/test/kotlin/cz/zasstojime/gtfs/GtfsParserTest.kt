@@ -73,6 +73,7 @@ class GtfsParserTest {
         assertEquals(Category.TRAIN, routes.getValue("LS1").category)
         assertEquals(true, routes.getValue("L907").isNight)
         assertEquals(true, routes.getValue("LX22").isSubstitute)
+        assertEquals("Bílá Hora - Nádraží Hostivař", routes.getValue("L22").longName)
         assertEquals("A", routes.getValue("L991").shortName)
 
         val stops = data.stops.associateBy { it.stopId }

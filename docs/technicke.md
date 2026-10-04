@@ -36,7 +36,7 @@ Stav dnešních spojů drží server v paměti (včetně rozpracované zastávky
 
 ## Datový model
 
-Schéma je ve Flyway migraci [`server/src/main/resources/db/migration/V1__init.sql`](../server/src/main/resources/db/migration/V1__init.sql);
+Schéma je ve Flyway migracích [`server/src/main/resources/db/migration/`](../server/src/main/resources/db/migration/);
 jOOQ z ní generuje třídy při buildu (`DDLDatabase`, bez běžící DB). Oproti původnímu návrhu:
 
 | Změna | Důvod |
@@ -45,6 +45,7 @@ jOOQ z ní generuje třídy při buildu (`DDLDatabase`, bez běžící DB). Opro
 | `trips_daily.finished_at`, `last_valid_at`, `last_origin_at`, `last_dep_origin_at` | Obnova po restartu (FR-14): znovuotevření, timeout, deduplikace a kontrola nereálného skoku pokračují tam, kde skončily |
 | `trips_daily.last_stop_seq` = poslední **uzavřená** zastávka | Po restartu se z ní obnoví nejvyšší sekvence; rozpracovaná zastávka se změří znovu |
 | `ingest_runs.stop_events` | FR-11: počet nových průjezdů v cyklu |
+| `routes.long_name` (V2) | Trasa linky z GTFS `route_long_name` pro popisky v žebříčcích |
 
 Oddíly `stop_events` se jmenují `stop_events_yYYYYmMM`. Server při startu a každou noc ve 03:15 zakládá minulý, tento a příští měsíc
 a maže oddíly starší než 13 měsíců; před zápisem průjezdu do dosud neznámého měsíce oddíl založí sám.
@@ -60,7 +61,7 @@ Všechny odpovědi obsahují `generated_at` a `data_as_of`. Cache: `public, s-ma
 | Endpoint | Obsah |
 |---|---|
 | `GET /api/day/{date\|today}` | Metriky sítě + rozpad podle kategorií |
-| `GET /api/day/{date}/leaderboard` | Žebříčky |
+| `GET /api/day/{date}/leaderboard` | Žebříčky; u linky i druh dopravy (`mode`: tram, bus, train, trolleybus, ferry, funicular) a trasa (`route_name`) |
 | `GET /api/day/{date}/record` | Rekordman dne |
 | `GET /api/day/{date}/hourly` | Hodinový vývoj |
 | `GET /api/lines?q=` | Vyhledání linky |

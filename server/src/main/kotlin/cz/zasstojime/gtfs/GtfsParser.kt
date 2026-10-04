@@ -48,6 +48,7 @@ object GtfsParser {
             category = Category.of(routeType, r.flag("is_regional")),
             isNight = r.flag("is_night"),
             isSubstitute = r.flag("is_substitute_transport"),
+            longName = r.str("route_long_name"),
         )
     }
 

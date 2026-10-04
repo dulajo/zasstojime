@@ -1,12 +1,19 @@
 const number = new Intl.NumberFormat("cs-CZ");
 const percent = new Intl.NumberFormat("cs-CZ", { maximumFractionDigits: 1, minimumFractionDigits: 1 });
+const wholePercent = new Intl.NumberFormat("cs-CZ", { maximumFractionDigits: 0 });
+const decimal = new Intl.NumberFormat("cs-CZ", { maximumFractionDigits: 1, minimumFractionDigits: 1 });
 
 export function formatNumber(value: number): string {
   return number.format(value);
 }
 
-export function formatPercent(value: number | null): string {
-  return value == null ? "—" : `${percent.format(value)} %`;
+export function formatPercent(value: number | null, digits: 0 | 1 = 1): string {
+  return value == null ? "—" : `${(digits === 0 ? wholePercent : percent).format(value)} %`;
+}
+
+/** Krátké doby s desetinou minuty, aby průměr na spoj nesplýval na „2 min“. */
+export function formatMinutes(seconds: number | null): string {
+  return seconds == null ? "—" : `${decimal.format(seconds / 60)} min`;
 }
 
 export function formatDuration(seconds: number | null): string {
