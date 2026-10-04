@@ -1,6 +1,6 @@
 # ADR-0025: Server v homelabu
 
-- **Stav:** Přijato
+- **Stav:** Nahrazeno ADR-0056
 - **Oblast:** Provoz
 - **Datum:** 2026-10-02
 

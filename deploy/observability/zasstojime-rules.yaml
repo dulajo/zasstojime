@@ -1,0 +1,197 @@
+# Grafana alert rules pro zasstojime. Metriky stahuje Prometheus z /q/metrics
+# (deploy/observability/prometheus-scrape.yml). Na observability (CT 119) patří do
+# /etc/grafana/provisioning/alerting/zasstojime-rules.yaml, pak restart grafana-server.
+# Směrování: výchozí notification policy posílá všechno na kontaktní bod telegram.
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: zasstojime
+    folder: Zasstojime
+    interval: 1m
+    rules:
+      # Prometheus nestáhne /q/metrics: služba nebo kontejner neběží.
+      # Žádná série (job v Prometheu chybí) se počítá taky jako výpadek.
+      - uid: zasstojime_down
+        title: ZasstojimeDown
+        condition: C
+        for: 5m
+        noDataState: Alerting
+        execErrState: Error
+        annotations:
+          summary: 'Zasstojime neodpovídá na /q/metrics (služba nebo LXC neběží). systemctl status zasstojime; docs/provoz.md – Když sběr stojí.'
+        labels: { severity: critical }
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: 'max(up{job="zasstojime"})'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model: { type: reduce, expression: A, reducer: last, refId: B }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              refId: C
+              conditions:
+                - evaluator: { type: lt, params: [1] }
+
+      # Služba běží, ale poslední úspěšný cyklus sběru je starší než ~5 min (3 min + čekání).
+      # Před prvním úspěšným cyklem po startu je stáří NaN; pak se počítá doba běhu služby.
+      # Když služba neběží, série zmizí a výpadek hlásí ZasstojimeDown.
+      - uid: zasstojime_not_collecting
+        title: ZasstojimeNotCollecting
+        condition: C
+        for: 2m
+        noDataState: OK
+        execErrState: Error
+        annotations:
+          summary: 'Zasstojime přes 5 minut nic nesebral (Golemio, síť nebo databáze). Logy {job="zasstojime"}, panel Chyby Golemia; docs/provoz.md – Když sběr stojí.'
+        labels: { severity: critical }
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: 'max(ingest_data_age_seconds{job="zasstojime"} >= 0) or max(process_uptime_seconds{job="zasstojime"})'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model: { type: reduce, expression: A, reducer: last, refId: B }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              refId: C
+              conditions:
+                - evaluator: { type: gt, params: [180] }
+
+      # Za poslední hodinu selhalo víc než 5 % cyklů; AC-07 chce úspěšnost aspoň 99 %.
+      # Zhasne, až podíl chyb v hodinovém okně klesne pod 5 %.
+      - uid: zasstojime_cycle_errors
+        title: ZasstojimeCycleErrors
+        condition: C
+        for: 10m
+        noDataState: OK
+        execErrState: Error
+        annotations:
+          summary: 'Zasstojime: za poslední hodinu selhalo víc než 5 % cyklů sběru. Příčinu ukáže golemio_errors_total{kind} a log.'
+        labels: { severity: warning }
+        data:
+          - refId: A
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: 'sum(increase(ingest_cycles_total{job="zasstojime", result="error"}[1h])) / sum(increase(ingest_cycles_total{job="zasstojime"}[1h]))'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model: { type: reduce, expression: A, reducer: last, refId: B }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              refId: C
+              conditions:
+                - evaluator: { type: gt, params: [0.05] }
+
+      # Import jízdního řádu (noční v 04:30 nebo při startu) selhal; sběr jede se starším.
+      - uid: zasstojime_gtfs_import_failed
+        title: ZasstojimeGtfsImportFailed
+        condition: C
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        annotations:
+          summary: 'Zasstojime: import jízdního řádu PID selhal, sběr běží se starším. Další pokus v 04:30 nebo restartem služby.'
+        labels: { severity: warning }
+        data:
+          - refId: A
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: 'sum(increase(gtfs_import_failures_total{job="zasstojime"}[1h]))'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model: { type: reduce, expression: A, reducer: last, refId: B }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              refId: C
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+
+      # Poslední úspěšný import jízdního řádu je starší než 30 h (import běží denně v 04:30).
+      # Hodnota 0 znamená, že se po startu ještě nenačetl; ta se nepočítá.
+      - uid: zasstojime_gtfs_stale
+        title: ZasstojimeGtfsStale
+        condition: C
+        for: 10m
+        noDataState: OK
+        execErrState: Error
+        annotations:
+          summary: 'Zasstojime: jízdní řád je starší než 30 h, nové spoje nemusí mít kategorii ani zastávky.'
+        labels: { severity: warning }
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: 'time() - max(gtfs_import_last_success_seconds{job="zasstojime"} > 0)'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model: { type: reduce, expression: A, reducer: last, refId: B }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              refId: C
+              conditions:
+                - evaluator: { type: gt, params: [108000] }
+
+      # Přibyl spoj se zpožděním nad ALERT_DELAY_S (2 h); na webu je rekordman „neověřený“ (ADR-0055).
+      # Metrika drží spoje dneška a včerejška, proto se hlídá přírůstek, ne stav.
+      - uid: zasstojime_record_unverified
+        title: ZasstojimeRecordUnverified
+        condition: C
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        annotations:
+          summary: 'Zasstojime: přibyl spoj se zpožděním nad 2 h. Ověř ho proti zprávám DPP (docs/provoz.md – Neověřený rekordman).'
+        labels: { severity: info }
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: 'max(delta(flagged_trips{job="zasstojime"}[15m]))'
+              instant: true
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model: { type: reduce, expression: A, reducer: last, refId: B }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              refId: C
+              conditions:
+                - evaluator: { type: gt, params: [0] }

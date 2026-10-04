@@ -1,6 +1,6 @@
 # ADR-0016: Čistý PostgreSQL 16
 
-- **Stav:** Přijato
+- **Stav:** Nahrazeno ADR-0057
 - **Oblast:** Architektura
 - **Datum:** 2026-10-02
 

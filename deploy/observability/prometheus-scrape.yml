@@ -1,0 +1,14 @@
+# Scrape job pro zasstojime. Patří do sekce scrape_configs v
+# /etc/prometheus/prometheus.yml na observability (CT 119), viz docs/provoz.md (krok 4).
+# <IP-ZASSTOJIME> nahraď adresou aplikačního LXC.
+#
+# Label host je stejný jako u logů v Loki (deploy/02-observability.sh), takže
+# se metriky a logy dají v Grafaně spojit.
+
+  - job_name: 'zasstojime'
+    metrics_path: /q/metrics
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['<IP-ZASSTOJIME>:8080']
+        labels:
+          host: 'zasstojime'
