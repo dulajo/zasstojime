@@ -126,6 +126,11 @@ Noční linka (`is_night`) a náhradní doprava (`is_substitute_transport`) jsou
 
 ## Moje trasa
 
+Na webu `/moje-trasa/`: linka, směr, nástupní a výstupní zastávka, den a čas odjezdu. Výsledek ukáže zpoždění
+na nástupu, v cíli a kolik spoj nabral cestou, průběh spoje po změřených zastávkách a stejný spoj v jiných dnech
+stejného typu. Zpoždění jednoho spoje se ukazuje v celých minutách useknutých dolů jako na odjezdových tabulích
+(179 s = „+2 min“, ještě včas).
+
 Uživatel zvolí **linku, stanici nástupu, stanici výstupu, plánovaný čas odjezdu a typ dne**. Spoj se v každém dni dohledá podle linky, uzlu nástupu a plánovaného času, ne podle `trip_id` (#47). Jen přímé spoje.
 
 | Metrika | Výpočet (za zvolené období) |

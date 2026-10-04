@@ -67,7 +67,7 @@ function liveSentence(late: number, running: number): string {
   if (share >= 0.5) return "Právě teď má zpoždění víc než polovina spojů na trase.";
   const ordinal = ordinals[Math.round(1 / share)];
   return ordinal ? `Zhruba každý ${ordinal} spoj na trase má právě teď zpoždění.` :
-    "Spoje na trase, které mají právě teď zpoždění.";
+    "Zpoždění má právě teď jen málokterý spoj na trase.";
 }
 
 function Headline({ day, isToday }: { day: Day; isToday: boolean }) {

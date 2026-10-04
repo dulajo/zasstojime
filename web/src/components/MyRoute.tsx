@@ -209,6 +209,7 @@ export function MyRoute() {
   const live = Boolean(selection.date) && isLiveDay(selection.date);
   const routeQuery = useRoute(selection.line && fromStop && toStop && selection.time && dayType ? {
     line: selection.line, from: fromStop.node_id, to: toStop.node_id, time: selection.time, dayType,
+    headsign: selection.dir === noDirection ? null : selection.dir,
   } : null, live);
   const day = routeQuery.data?.days.find((item) => item.date === selection.date);
   const tripQuery = useQuery({
@@ -295,7 +296,8 @@ export function MyRoute() {
                 {day.boarding_estimated && <span className="headline-detail">Odjezd z nástupní zastávky jsme nezachytili, nástup odhadujeme podle příjezdu.</span>}
               </> : day ? <p className="headline-sentence">{day.running ?
                 `Spoj právě jede. Na nástup přijel ${day.boarding_delay_s != null ? describe(day.boarding_delay_s) : "bez změřeného zpoždění"}, cíl ještě nemáme.` :
-                "Spoj jsme v tento den změřili jen zčásti, nástup nebo cíl chybí."}</p> :
+                day.boarding_delay_s != null ? `Na nástup přijel ${describe(day.boarding_delay_s)}. Do cílové zastávky jsme ho nezachytili, projel ji nejspíš mezi dvěma měřeními.` :
+                  "Spoj jsme v tento den změřili jen zčásti, nástup chybí."}</p> :
                 <p className="headline-sentence">{notYet ? `Spoj v ${selection.time} dnes teprve pojede. Výsledek se objeví, jakmile vyjede.` :
                   "V tento den jsme spoj nezměřili. Mohl nejet, nebo jsme ho nezachytili."}</p>}
             </div>

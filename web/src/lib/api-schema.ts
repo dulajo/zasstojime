@@ -369,6 +369,7 @@ export interface paths {
                 query: {
                     day_type: string | null;
                     from: number | null;
+                    headsign: string | null;
                     line: string | null;
                     period: string | null;
                     time: string | null;

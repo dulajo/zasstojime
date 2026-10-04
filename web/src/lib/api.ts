@@ -15,7 +15,7 @@ export type TripStop = components["schemas"]["TripStopDto"];
 export type CalendarDay = components["schemas"]["CalendarDayResponse"];
 export type DayType = "workday" | "saturday" | "sunday_holiday";
 
-export type MyRouteQuery = { line: string; from: number; to: number; time: string; dayType: string };
+export type MyRouteQuery = { line: string; from: number; to: number; time: string; dayType: string; headsign: string | null };
 
 // Produkční build bez adresy zastaví scripts/check-build-env.mjs; localhost je jen pro `npm run dev`.
 const baseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080").replace(/\/$/, "");
@@ -47,9 +47,9 @@ export const api = {
   departures: (line: string, from: number, dayType: string, headsign: string | null, signal?: AbortSignal) =>
     get<{ items: DepartureOption[] }>(`/api/lines/${segment(line)}/departures?from=${from}&day_type=${segment(dayType)}` +
       (headsign ? `&headsign=${segment(headsign)}` : ""), signal),
-  myRoute: ({ line, from, to, time, dayType }: MyRouteQuery, signal?: AbortSignal) =>
+  myRoute: ({ line, from, to, time, dayType, headsign }: MyRouteQuery, signal?: AbortSignal) =>
     get<MyRoute>(`/api/my-route?line=${segment(line)}&from=${from}&to=${to}&time=${segment(time)}` +
-      `&day_type=${segment(dayType)}&period=30d`, signal),
+      `&day_type=${segment(dayType)}&period=30d` + (headsign ? `&headsign=${segment(headsign)}` : ""), signal),
   trip: (date: string, tripId: string, signal?: AbortSignal) =>
     get<Trip>(`/api/trip/${segment(date)}/${segment(tripId)}`, signal),
   calendar: (date: string, signal?: AbortSignal) => get<CalendarDay>(`/api/calendar/${segment(date)}`, signal),

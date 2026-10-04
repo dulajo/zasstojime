@@ -1233,6 +1233,17 @@
             "required": true
           },
           {
+            "name": "headsign",
+            "in": "query",
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "required": true
+          },
+          {
             "name": "line",
             "in": "query",
             "schema": {

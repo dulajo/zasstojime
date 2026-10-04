@@ -136,7 +136,8 @@ class MyRouteResource(private val routes: RouteRepository, private val ingest: I
     @APIResponse(responseCode = "200", content = [Content(schema = Schema(implementation = MyRouteResponse::class))])
     fun route(@QueryParam("line") line: String?, @QueryParam("from") from: Int?,
               @QueryParam("to") to: Int?, @QueryParam("time") time: String?,
-              @QueryParam("day_type") dayType: String?, @QueryParam("period") period: String?): Response {
+              @QueryParam("day_type") dayType: String?, @QueryParam("period") period: String?,
+              @QueryParam("headsign") headsign: String?): Response {
         if (line.isNullOrBlank() || line.length > 16 || from == null || to == null || from == to || dayType !in DAY_TYPES)
             throw BadRequestException("Vyberte linku, dvě různé stanice a typ dne")
         val localTime = try { LocalTime.parse(time, DateTimeFormatter.ofPattern("HH:mm")) }
@@ -150,7 +151,8 @@ class MyRouteResource(private val routes: RouteRepository, private val ingest: I
             "13m" -> today.minusMonths(13).plusDays(1)
             else -> throw BadRequestException("Období musí být 30d, 90d nebo 13m")
         }
-        val observations = routes.observations(line, from, to, timeText, dayType!!, since, today)
+        if (headsign != null && headsign.length > 100) throw BadRequestException("Směr je příliš dlouhý")
+        val observations = routes.observations(line, from, to, timeText, dayType!!, since, today, headsign?.ifBlank { null })
         val measured = observations.filter { it.boardingDelay != null && it.arrivalDelay != null }
         val count = measured.size
         fun average(value: (RouteObservation) -> Double): Double? =

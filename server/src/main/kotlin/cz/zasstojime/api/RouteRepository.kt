@@ -73,10 +73,11 @@ class RouteRepository(private val dsl: DSLContext) {
 
     /**
      * A direct trip is selected separately for each service day, never by historical trip_id.
-     * A running trip that has not reached the destination yet is returned without arrival.
+     * A running trip that has not reached the destination yet is returned without arrival. With a known
+     * [headsign] the direction is certain, so a finished trip whose destination was not measured is returned too.
      */
     fun observations(line: String, fromNode: Int, toNode: Int, time: String,
-                     dayType: String, since: LocalDate, through: LocalDate): List<RouteObservation> = dsl.fetch(
+                     dayType: String, since: LocalDate, through: LocalDate, headsign: String? = null): List<RouteObservation> = dsl.fetch(
         """SELECT DISTINCT ON (a.service_date)
                   a.service_date, a.trip_id, a.planned_dep,
                   COALESCE(a.dep_delay, a.arr_delay) AS boarding_delay,
@@ -97,9 +98,10 @@ class RouteRepository(private val dsl: DSLContext) {
              AND c.day_type = ? AND a.service_date >= ? AND a.service_date <= ?
              AND a.planned_dep IS NOT NULL
              AND to_char(a.planned_dep AT TIME ZONE 'Europe/Prague', 'HH24:MI') = ?
-             AND (b.stop_seq IS NOT NULL OR t.status = 'running')
+             AND (CAST(? AS text) IS NULL OR t.headsign = ?)
+             AND (b.stop_seq IS NOT NULL OR t.status = 'running' OR CAST(? AS text) IS NOT NULL)
            ORDER BY a.service_date, (b.stop_seq IS NULL), a.planned_dep""",
-        toNode, line, fromNode, dayType, since, through, time,
+        toNode, line, fromNode, dayType, since, through, time, headsign, headsign, headsign,
     ).map { row ->
         RouteObservation(row.get("service_date", LocalDate::class.java), row.str("trip_id"),
             row.get("planned_dep", OffsetDateTime::class.java).toInstant(),

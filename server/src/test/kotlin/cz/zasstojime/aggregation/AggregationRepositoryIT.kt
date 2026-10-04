@@ -143,6 +143,19 @@ class AggregationRepositoryIT {
         assertTrue(runningRoute.body().contains("\"measured_days\":0"), runningRoute.body())
         assertTrue(runningRoute.headers().firstValue("Cache-Control").orElse("").contains("s-maxage=30"))
 
+        // Dojetý spoj bez změřeného cíle vrátí jen dotaz se směrem, bez něj by mohl jít opačným směrem.
+        val partialAt = at.plusSeconds(1800)
+        val partial = TripState(TripKey(day, "aggregation-partial"), "AGG", "97", Category.TRAM,
+            "Centrum", null, partialAt, partialAt, partialAt).apply { status = TripStatus.FINISHED; depTotal = 1; depOnTime = 1 }
+        ingest.persistCycle(listOf(partial), listOf(StopEvent(day, partial.key.tripId, 1, partial.routeId, "AGG-STOP", 98765,
+            partialAt, partialAt, 30, 30)), IngestRun(partialAt, partialAt, true, 1, 1, 1))
+        fun partialRoute(query: String) = http.send(HttpRequest.newBuilder(URI.create(
+            "http://localhost:8081/api/my-route?line=97&from=98765&to=98766&time=07:35&day_type=workday&period=13m$query")).build(),
+            HttpResponse.BodyHandlers.ofString()).body()
+        assertTrue(partialRoute("").contains("\"days\":[]"), partialRoute(""))
+        assertTrue(partialRoute("&headsign=Centrum").contains("\"trip_id\":\"aggregation-partial\""), partialRoute("&headsign=Centrum"))
+        assertTrue(partialRoute("&headsign=Jinam").contains("\"days\":[]"), partialRoute("&headsign=Jinam"))
+
         // Nabídka časů hledá jen za posledních 13 dní, proto spoj z dneška.
         val today = LocalDate.now(PragueTime.ZONE)
         val dayType = CzechCalendar.dayType(today).db
