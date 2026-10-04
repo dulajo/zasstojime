@@ -298,6 +298,44 @@ ssh root@10.140.0.126 /root/03-web.sh
 Restart historii nepřeruší: rozjeté spoje se obnoví z DB (FR-14), migrace běží při startu.
 Před aktualizací, která mění schéma, udělat dump databáze (postup v `homelab/postgres-db`).
 
+Komentáře `#` v blocích výše jsou pro bash. Zsh na Macu je v interaktivním terminálu bere
+jako argumenty, proto je při kopírování vynech (nebo zapni `setopt interactivecomments`).
+
+### Kontrola, že se nasazuje nový kód
+
+Build ze zastaralého checkoutu projde bez chyby, jen nasadí starý kód. Před nahráním ověř,
+že jar obsahuje nejnovější migraci z repozitáře:
+
+```bash
+git checkout master && git pull
+ls server/src/main/resources/db/migration/ | tail -1
+unzip -l server/build/quarkus-app/app/*.jar | grep db/migration
+```
+
+Po restartu v aplikačním LXC:
+
+```bash
+journalctl -u zasstojime --since "5 min ago" | grep -iE "migrat|GTFS import"
+```
+
+`Successfully validated N migrations` musí odpovídat počtu migrací v repozitáři.
+
+### Import jízdního řádu hned
+
+Server stahuje jízdní řád každou noc ve 4:30 a při startu, když je poslední import starší
+než 24 h. Když změna potřebuje nová data z GTFS hned (např. V2 `routes.long_name`),
+v aplikačním LXC:
+
+```bash
+echo 'APP_GTFS_MAX_AGE=1m' >> /opt/zasstojime/config/zasstojime.env
+systemctl restart zasstojime
+journalctl -u zasstojime -f | grep -i "GTFS import"
+sed -i '/^APP_GTFS_MAX_AGE=/d' /opt/zasstojime/config/zasstojime.env
+```
+
+Řádek `GTFS import: … linek …` přijde do minuty po startu; sledování logu ukončí Ctrl+C.
+Pak `APP_GTFS_MAX_AGE` smaž (poslední příkaz), jinak se jízdní řád stáhne při každém restartu.
+
 ## Zatím chybí
 
 - Denní `pg_dump` mimo homelab (ADR-0031); teď jen PBS celého CT 124.
