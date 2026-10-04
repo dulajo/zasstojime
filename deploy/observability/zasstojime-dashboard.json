@@ -1,31 +1,67 @@
 {
-  "uid": "zasstojime-provoz",
-  "title": "Zasstojime – provoz",
+  "__inputs": [
+    {
+      "name": "DS_PROMETHEUS",
+      "label": "Prometheus",
+      "type": "datasource",
+      "pluginId": "prometheus",
+      "pluginName": "Prometheus"
+    },
+    {
+      "name": "DS_LOKI",
+      "label": "Loki",
+      "type": "datasource",
+      "pluginId": "loki",
+      "pluginName": "Loki"
+    }
+  ],
+  "__requires": [
+    {
+      "type": "datasource",
+      "id": "prometheus",
+      "name": "Prometheus"
+    },
+    {
+      "type": "datasource",
+      "id": "loki",
+      "name": "Loki"
+    }
+  ],
+  "title": "Zasstojime",
+  "uid": "zasstojime",
   "tags": [
     "zasstojime"
   ],
+  "description": "Sběr dochvilnosti PID: stav, cykly, Golemio, databáze a logy. Zdroj: deploy/observability v repu zasstojime.",
   "timezone": "Europe/Prague",
-  "schemaVersion": 41,
-  "version": 1,
-  "editable": false,
   "refresh": "30s",
   "time": {
     "from": "now-24h",
     "to": "now"
   },
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "graphTooltip": 1,
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  },
   "panels": [
     {
       "id": 1,
       "type": "stat",
-      "title": "Stáří dat",
+      "title": "Stav služby",
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
         "x": 0,
         "y": 0,
-        "w": 6,
+        "w": 4,
         "h": 4
       },
       "targets": [
@@ -33,9 +69,69 @@
           "refId": "A",
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "max(ingest_data_age_seconds)",
+          "expr": "max(up{job=\"zasstojime\"})",
+          "legendFormat": ""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "description": "1 = Prometheus stahuje /q/metrics."
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Stáří dat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 4,
+        "y": 0,
+        "w": 5,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "max(ingest_data_age_seconds{job=\"zasstojime\"})",
           "legendFormat": ""
         }
       ],
@@ -77,20 +173,20 @@
         "graphMode": "none",
         "textMode": "value"
       },
-      "description": "Sekundy od posledního úspěšného cyklu. Alert nad 5 min."
+      "description": "Sekundy od posledního úspěšného cyklu sběru. Alert nad ~5 min."
     },
     {
-      "id": 2,
+      "id": 3,
       "type": "stat",
       "title": "Úspěšnost cyklů (24 h)",
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
-        "x": 6,
+        "x": 9,
         "y": 0,
-        "w": 6,
+        "w": 5,
         "h": 4
       },
       "targets": [
@@ -98,9 +194,9 @@
           "refId": "A",
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum(increase(ingest_cycles_total{result=\"ok\"}[24h])) / sum(increase(ingest_cycles_total[24h]))",
+          "expr": "sum(increase(ingest_cycles_total{job=\"zasstojime\", result=\"ok\"}[24h])) / sum(increase(ingest_cycles_total{job=\"zasstojime\"}[24h]))",
           "legendFormat": ""
         }
       ],
@@ -146,17 +242,17 @@
       "description": "AC-07: aspoň 99 %."
     },
     {
-      "id": 3,
+      "id": 4,
       "type": "stat",
       "title": "Spoje na trase",
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
-        "x": 12,
+        "x": 14,
         "y": 0,
-        "w": 6,
+        "w": 5,
         "h": 4
       },
       "targets": [
@@ -164,9 +260,9 @@
           "refId": "A",
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "max(trips_running)",
+          "expr": "max(trips_running{job=\"zasstojime\"})",
           "legendFormat": ""
         }
       ],
@@ -188,17 +284,17 @@
       }
     },
     {
-      "id": 4,
+      "id": 5,
       "type": "stat",
       "title": "Velikost DB",
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
-        "x": 18,
+        "x": 19,
         "y": 0,
-        "w": 6,
+        "w": 5,
         "h": 4
       },
       "targets": [
@@ -206,9 +302,9 @@
           "refId": "A",
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "max(db_size_bytes)",
+          "expr": "max(db_size_bytes{job=\"zasstojime\"})",
           "legendFormat": ""
         }
       ],
@@ -229,15 +325,16 @@
         "colorMode": "none",
         "graphMode": "none",
         "textMode": "value"
-      }
+      },
+      "description": "Databáze zasstojime ve sdíleném PostgreSQL (CT 124)."
     },
     {
-      "id": 5,
+      "id": 6,
       "type": "timeseries",
       "title": "Cykly sběru",
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
         "x": 0,
@@ -250,9 +347,9 @@
           "refId": "A",
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum by (result) (increase(ingest_cycles_total[5m]))",
+          "expr": "sum by (result) (increase(ingest_cycles_total{job=\"zasstojime\"}[5m]))",
           "legendFormat": "{{result}}"
         }
       ],
@@ -301,12 +398,12 @@
       "description": "Počet cyklů za 5 min podle výsledku (při intervalu 30 s je jich 10)."
     },
     {
-      "id": 6,
+      "id": 7,
       "type": "timeseries",
       "title": "Délka cyklu",
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
         "x": 8,
@@ -319,18 +416,18 @@
           "refId": "A",
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "rate(ingest_cycle_seconds_sum[5m]) / rate(ingest_cycle_seconds_count[5m])",
+          "expr": "rate(ingest_cycle_seconds_sum{job=\"zasstojime\"}[5m]) / rate(ingest_cycle_seconds_count{job=\"zasstojime\"}[5m])",
           "legendFormat": "průměr"
         },
         {
           "refId": "B",
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "max(ingest_cycle_seconds_max)",
+          "expr": "max(ingest_cycle_seconds_max{job=\"zasstojime\"})",
           "legendFormat": "maximum"
         }
       ],
@@ -347,12 +444,12 @@
       "options": {}
     },
     {
-      "id": 7,
+      "id": 8,
       "type": "timeseries",
       "title": "Chyby Golemia",
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
         "x": 16,
@@ -365,9 +462,9 @@
           "refId": "A",
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum by (kind) (increase(golemio_errors_total[15m]))",
+          "expr": "sum by (kind) (increase(golemio_errors_total{job=\"zasstojime\"}[15m]))",
           "legendFormat": "{{kind}}"
         }
       ],
@@ -381,15 +478,16 @@
         },
         "overrides": []
       },
-      "options": {}
+      "options": {},
+      "description": "Za 15 min. http_401/403 = API klíč, timeout/io = síť nebo Golemio."
     },
     {
-      "id": 8,
+      "id": 9,
       "type": "timeseries",
       "title": "Vozidla ve snímku",
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
         "x": 0,
@@ -402,47 +500,10 @@
           "refId": "A",
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "max(ingest_vehicles)",
+          "expr": "max(ingest_vehicles{job=\"zasstojime\"})",
           "legendFormat": "vozidla"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "custom": {
-            "fillOpacity": 10,
-            "showPoints": "never"
-          }
-        },
-        "overrides": []
-      },
-      "options": {}
-    },
-    {
-      "id": 9,
-      "type": "timeseries",
-      "title": "Nové průjezdy za minutu",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "x": 8,
-        "y": 11,
-        "w": 8,
-        "h": 7
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "rate(ingest_stop_events_total[5m]) * 60",
-          "legendFormat": "průjezdy"
         }
       ],
       "fieldConfig": {
@@ -460,13 +521,13 @@
     {
       "id": 10,
       "type": "timeseries",
-      "title": "Zahozené odjezdy",
+      "title": "Nové průjezdy za minutu",
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
-        "x": 16,
+        "x": 8,
         "y": 11,
         "w": 8,
         "h": 7
@@ -476,48 +537,10 @@
           "refId": "A",
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum by (reason) (increase(ingest_departures_dropped_total[15m]))",
-          "legendFormat": "{{reason}}"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "custom": {
-            "fillOpacity": 10,
-            "showPoints": "never"
-          }
-        },
-        "overrides": []
-      },
-      "options": {},
-      "description": "Za 15 min podle důvodu. db_unavailable znamená ztrátu dat."
-    },
-    {
-      "id": 11,
-      "type": "timeseries",
-      "title": "Přeskočené snímky",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 18,
-        "w": 8,
-        "h": 7
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum by (reason) (increase(ingest_snapshots_skipped_total[15m]))",
-          "legendFormat": "{{reason}}"
+          "expr": "rate(ingest_stop_events_total{job=\"zasstojime\"}[5m]) * 60",
+          "legendFormat": "průjezdy"
         }
       ],
       "fieldConfig": {
@@ -533,15 +556,53 @@
       "options": {}
     },
     {
-      "id": 12,
+      "id": 11,
       "type": "timeseries",
-      "title": "Neověřené spoje (nad ALERT_DELAY_S)",
+      "title": "Zahozené odjezdy",
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
-        "x": 8,
+        "x": 16,
+        "y": 11,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "sum by (reason) (increase(ingest_departures_dropped_total{job=\"zasstojime\"}[15m]))",
+          "legendFormat": "{{reason}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {},
+      "description": "Za 15 min podle důvodu (metodika). db_unavailable znamená ztrátu dat."
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Přeskočené snímky",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 0,
         "y": 18,
         "w": 8,
         "h": 7
@@ -551,10 +612,10 @@
           "refId": "A",
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "max(flagged_trips)",
-          "legendFormat": "spoje"
+          "expr": "sum by (reason) (increase(ingest_snapshots_skipped_total{job=\"zasstojime\"}[15m]))",
+          "legendFormat": "{{reason}}"
         }
       ],
       "fieldConfig": {
@@ -572,10 +633,47 @@
     {
       "id": 13,
       "type": "timeseries",
+      "title": "Neověřené spoje (nad ALERT_DELAY_S)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 18,
+        "w": 8,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "max(flagged_trips{job=\"zasstojime\"})",
+          "legendFormat": "spoje"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
       "title": "Paměť JVM",
       "datasource": {
         "type": "prometheus",
-        "uid": "prometheus"
+        "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
         "x": 16,
@@ -588,18 +686,18 @@
           "refId": "A",
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum(jvm_memory_used_bytes{area=\"heap\"})",
+          "expr": "sum(jvm_memory_used_bytes{job=\"zasstojime\", area=\"heap\"})",
           "legendFormat": "heap"
         },
         {
           "refId": "B",
           "datasource": {
             "type": "prometheus",
-            "uid": "prometheus"
+            "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum(jvm_memory_committed_bytes{area=\"heap\"})",
+          "expr": "sum(jvm_memory_committed_bytes{job=\"zasstojime\", area=\"heap\"})",
           "legendFormat": "přiděleno"
         }
       ],
@@ -614,12 +712,42 @@
         "overrides": []
       },
       "options": {}
+    },
+    {
+      "id": 15,
+      "type": "logs",
+      "title": "Logy",
+      "datasource": {
+        "type": "loki",
+        "uid": "${DS_LOKI}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 25,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${DS_LOKI}"
+          },
+          "expr": "{job=\"zasstojime\"} | level=~\"warn|error\""
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true
+      },
+      "description": "Varování a chyby z journalu služby (Alloy → Loki)."
     }
-  ],
-  "templating": {
-    "list": []
-  },
-  "annotations": {
-    "list": []
-  }
+  ]
 }

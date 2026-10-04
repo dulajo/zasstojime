@@ -1,9 +1,9 @@
-# Homelab: server + PostgreSQL (docs/technicke.md – Nasazení, postup v docs/provoz.md).
+# Místní běh celé sestavy: server + PostgreSQL. V homelabu běží server jako systemd
+# služba v LXC se sdíleným PostgreSQL (ADR-0056, docs/provoz.md).
 # Před `docker compose up --build` spusť v server/ `./gradlew build`.
-# Monitoring (Prometheus + Grafana, ADR-0030): `docker compose --profile monitoring up -d`.
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     restart: unless-stopped
     environment:
       POSTGRES_DB: zasstojime
@@ -33,36 +33,5 @@ services:
       # API a /q/metrics jen lokálně; ven přes Cloudflare Tunnel (ADR-0026)
       - "127.0.0.1:8080:8080"
 
-  prometheus:
-    image: prom/prometheus:v3.15.0
-    profiles: [monitoring]
-    restart: unless-stopped
-    command:
-      - --config.file=/etc/prometheus/prometheus.yml
-      - --storage.tsdb.retention.time=30d
-    volumes:
-      - ./deploy/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus:/prometheus
-
-  grafana:
-    image: grafana/grafana:13.2.3
-    profiles: [monitoring]
-    restart: unless-stopped
-    depends_on: [prometheus]
-    environment:
-      GF_USERS_ALLOW_SIGN_UP: "false"
-      GF_ANALYTICS_REPORTING_ENABLED: "false"
-      GF_DATE_FORMATS_DEFAULT_TIMEZONE: Europe/Prague
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
-      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
-    volumes:
-      - ./deploy/monitoring/grafana:/etc/grafana/provisioning:ro
-      - grafana:/var/lib/grafana
-    ports:
-      # Jen pro správu přes WireGuard/NPM (ADR-0026); GRAFANA_BIND = adresa VM ve správcovské síti
-      - "${GRAFANA_BIND:-127.0.0.1}:3001:3000"
-
 volumes:
   pgdata:
-  prometheus:
-  grafana:
