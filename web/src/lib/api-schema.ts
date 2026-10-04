@@ -487,6 +487,8 @@ export interface components {
         RouteRankDto: {
             line: string;
             category: string;
+            mode: string;
+            route_name: string | null;
             route_id: string;
             totals: components["schemas"]["TotalsDto"];
             /** Format: double */

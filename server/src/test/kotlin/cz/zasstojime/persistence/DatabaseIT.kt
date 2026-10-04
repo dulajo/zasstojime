@@ -139,8 +139,10 @@ class DatabaseIT {
             trips = listOf(GtfsTrip("22_1", "L22", 18_000), GtfsTrip("907_1", "L907", 87_180)),
         )
         gtfs.save(data)
-        gtfs.save(GtfsData(data.routes.map { it.copy(shortName = "22N") }, data.stops, data.trips))
-        assertEquals("22N", gtfs.loadRoutes().single { it.routeId == "L22" }.shortName)
+        gtfs.save(GtfsData(data.routes.map { it.copy(shortName = "22N", longName = "Bílá Hora - Nádraží Hostivař") }, data.stops, data.trips))
+        val route = gtfs.loadRoutes().single { it.routeId == "L22" }
+        assertEquals("22N", route.shortName)
+        assertEquals("Bílá Hora - Nádraží Hostivař", route.longName)
         assertNull(gtfs.loadStops().single { it.stopId == "T1" }.nodeId)
         assertEquals(87_180, gtfs.loadRecentTrips().single { it.tripId == "907_1" }.firstDepartureS)
 

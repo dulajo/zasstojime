@@ -6,6 +6,9 @@ import cz.zasstojime.aggregation.DashboardRepository
 import cz.zasstojime.aggregation.DaySnapshot
 import cz.zasstojime.aggregation.RecordTrip
 import cz.zasstojime.aggregation.RouteTotals
+import cz.zasstojime.gtfs.Category
+import cz.zasstojime.gtfs.GtfsCache
+import cz.zasstojime.gtfs.RouteInfo
 import cz.zasstojime.time.PragueTime
 import jakarta.ws.rs.BadRequestException
 import jakarta.ws.rs.GET
@@ -74,13 +77,35 @@ data class DayResponse(
 data class RouteRankDto(
     val line: String,
     val category: String,
+    /** Druh dopravy pro popisek linky: tram, bus, train, trolleybus, ferry, funicular, metro, other. */
+    val mode: String,
+    /** Trasa linky z jízdního řádu, např. „Praha - Milovice“; `null`, dokud ji import nedoplní. */
+    @SerialName("route_name") val routeName: String?,
     @SerialName("route_id") val routeId: String,
     val totals: TotalsDto,
     @SerialName("average_max_delay_s") val averageMaxDelayS: Double?,
 )
 
-private fun RouteTotals.dto() = RouteRankDto(routeShort, category.db, routeId, totals.dto(),
-    if (totals.tripsTotal == 0) null else totals.sumMaxDelay.toDouble() / totals.tripsTotal)
+private fun RouteTotals.dto(route: RouteInfo?) = RouteRankDto(routeShort, category.db,
+    transportMode(route?.routeType, category), route?.longName, routeId, totals.dto(), if (totals.tripsTotal == 0) null else totals.sumMaxDelay.toDouble() / totals.tripsTotal)
+
+/** Kategorie slučuje trolejbus, přívoz a lanovku do `other`, popisek linky je ale potřebuje rozlišit. */
+internal fun transportMode(routeType: Int?, category: Category): String = when (routeType) {
+    0 -> "tram"
+    1 -> "metro"
+    2 -> "train"
+    3 -> "bus"
+    4 -> "ferry"
+    7 -> "funicular"
+    11 -> "trolleybus"
+    else -> when (category) {
+        Category.TRAM -> "tram"
+        Category.METRO -> "metro"
+        Category.TRAIN -> "train"
+        Category.BUS_CITY, Category.BUS_REGIONAL -> "bus"
+        Category.OTHER -> "other"
+    }
+}
 
 @Serializable
 data class LeaderboardResponse(
@@ -122,6 +147,7 @@ data class HourlyResponse(
 class DayResource(
     private val aggregation: AggregationService,
     private val repository: DashboardRepository,
+    private val gtfs: GtfsCache,
 ) {
     @GET
     @Path("{date}")
@@ -147,12 +173,13 @@ class DayResource(
         val coverage = repository.coverage(date)
         val routes = snapshot.routes.values.filter { it.category.public }
         val eligible = routes.filter { it.totals.tripsFinished >= 20 }
+        val dto = { route: RouteTotals -> route.dto(gtfs.route(route.routeId)) }
         return cached(LeaderboardResponse(date.toString(), Instant.now().toString(),
             snapshot.dataAsOf?.toString() ?: coverage.dataAsOf?.toString(), coverage.incomplete,
-            routes.sortedByDescending { it.totals.sumMaxDelay }.take(10).map { it.dto() },
-            eligible.sortedByDescending { it.totals.sumMaxDelay.toDouble() / it.totals.tripsTotal }.take(10).map { it.dto() },
+            routes.sortedByDescending { it.totals.sumMaxDelay }.take(10).map(dto),
+            eligible.sortedByDescending { it.totals.sumMaxDelay.toDouble() / it.totals.tripsTotal }.take(10).map(dto),
             eligible.filter { it.totals.punctuality != null }
-                .sortedBy { it.totals.punctuality }.take(10).map { it.dto() }))
+                .sortedBy { it.totals.punctuality }.take(10).map(dto)))
     }
 
     @GET

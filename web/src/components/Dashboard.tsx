@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError, type Day, type Leaderboard, type RecordDay, type RouteRank } from "@/lib/api";
 import { demoData } from "@/lib/demo-data";
-import { formatDate, formatDuration, formatNumber, formatPercent, formatTimestamp, isLiveDay, todayInPrague } from "@/lib/format";
+import { formatDate, formatDuration, formatMinutes, formatNumber, formatPercent, formatTimestamp, isLiveDay, todayInPrague } from "@/lib/format";
 
 const categoryNames: Record<string, string> = {
   tram: "Tramvaje",
@@ -24,8 +24,23 @@ function Metric({ label, value, note, accent = false }: {
   </div>;
 }
 
-function Ranking({ title, subtitle, items, value }: {
-  title: string; subtitle: string; items: RouteRank[]; value: (item: RouteRank) => string;
+const modeNames: Record<string, string> = {
+  tram: "Tram", bus: "Bus", train: "Vlak", trolleybus: "Trolejbus", ferry: "Přívoz", funicular: "Lanovka", metro: "Metro",
+};
+
+function LineBadge({ item }: { item: RouteRank }) {
+  const mode = modeNames[item.mode] ? item.mode : "other";
+  // GTFS odděluje zastávky trasy spojovníkem („Praha - Milovice“), na webu je pomlčka.
+  const route = item.route_name?.split(" - ").join(" – ");
+  return <span className={`line-badge line-${mode}`}>
+    <span className="line-mode">{modeNames[mode] ?? "Linka"}</span>
+    <span className="line-text"><span className="line-name">{item.line}</span>
+      {route && <span className="line-route" title={route}>{route}</span>}</span>
+  </span>;
+}
+
+function Ranking({ title, subtitle, items, value, detail }: {
+  title: string; subtitle: string; items: RouteRank[]; value: (item: RouteRank) => string; detail: (item: RouteRank) => string;
 }) {
   return <section className="ranking-panel">
     <div className="panel-heading"><div><h3>{title}</h3><p>{subtitle}</p></div></div>
@@ -33,28 +48,63 @@ function Ranking({ title, subtitle, items, value }: {
       <ol className="ranking-list">{items.slice(0, 5).map((item, index) =>
         <li key={`${item.route_id}-${index}`}>
           <span className="rank-index">{String(index + 1).padStart(2, "0")}</span>
-          <span className="rank-line">{item.line}</span>
-          <span className="rank-value">{value(item)}</span>
+          <LineBadge item={item} />
+          <span className="rank-value"><b>{value(item)}</b><small>{detail(item)}</small></span>
         </li>)}</ol>}
   </section>;
 }
 
 type Loaded<T> = { data?: T; failed: boolean };
 
+const ordinals: Record<number, string> = { 2: "druhý", 3: "třetí", 4: "čtvrtý", 5: "pátý", 6: "šestý",
+  7: "sedmý", 8: "osmý", 9: "devátý", 10: "desátý" };
+
+/** Lidská věta k podílu zpožděných spojů. Přesná čísla stojí vedle, věta je jen přibližná. */
+function liveSentence(late: number, running: number): string {
+  if (late === 0) return "Právě teď nemá zpoždění žádný spoj na trase.";
+  const share = late / running;
+  if (share >= 0.5) return "Právě teď má zpoždění víc než polovina spojů na trase.";
+  const ordinal = ordinals[Math.round(1 / share)];
+  return ordinal ? `Zhruba každý ${ordinal} spoj na trase má právě teď zpoždění.` :
+    "Spoje na trase, které mají právě teď zpoždění.";
+}
+
+function Headline({ day, isToday }: { day: Day; isToday: boolean }) {
+  const { running_trips: running, running_late_trips: late } = day;
+  const network = day.network;
+  const live = running != null && late != null && running > 0;
+  return <section aria-label="Hlavní čísla" className={`headline${live ? "" : " headline-single"}`}>
+    {live && <div className="headline-live">
+      <span className="headline-kicker"><span className="live-dot" /> Právě teď</span>
+      <strong className="headline-number">{formatPercent((late / running) * 100, 0)}</strong>
+      <p className="headline-sentence">{liveSentence(late, running)}</p>
+      <span className="headline-detail"><b>{formatNumber(late)}</b> z {formatNumber(running)} spojů na trase jede 3 min a víc pozdě</span>
+    </div>}
+    <div className="headline-index">
+      <span className="headline-kicker">Index dochvilnosti {isToday ? "dnes" : "za den"}</span>
+      <strong className="headline-number">{formatPercent(network.punctuality_pct)}</strong>
+      <p className="headline-sentence">odjezdů ze zastávek bylo včas</p>
+      <span className="headline-detail">{formatNumber(network.dep_on_time)} z {formatNumber(network.dep_total)} odjezdů</span>
+    </div>
+  </section>;
+}
+
 function Overview({ day, isToday, leaderboard, record }: {
   day: Day; isToday: boolean; leaderboard: Loaded<Leaderboard>; record: Loaded<RecordDay>;
 }) {
   const categories = Object.entries(day.categories);
+  const network = day.network;
+  const perTrip = network.trips_total > 0 ? network.sum_max_delay / network.trips_total : null;
   return <>
     {day.incomplete && <div className="notice">Sběr měl {isToday ? "dnes" : "v tento den"} delší výpadek. Uvedená čísla jsou neúplná.</div>}
-    <section aria-labelledby="overview-title" className="section-block">
-      <div className="section-heading"><div><span className="section-kicker">Přehled dne</span><h2 id="overview-title">Co ukazují odjezdy</h2></div>
+    <Headline day={day} isToday={isToday} />
+    <section aria-labelledby="overview-title" className="section-block section-block-tight">
+      <div className="section-heading"><div><span className="section-kicker">Přehled dne</span><h2 id="overview-title">Kolik zpoždění se nasbíralo</h2></div>
         <p>Dochvilnost počítáme při odjezdu z každé zastávky, ne až na konečné.</p></div>
-      <div className="metric-grid">
-        <Metric label="Index dochvilnosti" value={formatPercent(day.network.punctuality_pct)} note={`${formatNumber(day.network.dep_on_time)} z ${formatNumber(day.network.dep_total)} odjezdů včas`} accent />
-        <Metric label="Součet zpoždění spojů" value={formatDuration(day.network.sum_max_delay)} note="Součet největšího zpoždění každého spoje" />
-        <Metric label="Průměr zpožděného odjezdu" value={formatDuration(day.network.average_late_delay_s)} note={`${formatNumber(day.network.dep_late)} zpožděných odjezdů`} />
-        <Metric label="Právě na trase" value={day.running_trips == null ? "—" : formatNumber(day.running_trips)} note={day.running_late_trips == null ? "Živý stav není dostupný" : `${formatNumber(day.running_late_trips)} spojů má zpoždění`} />
+      <div className="metric-grid metric-grid-3">
+        <Metric label="Součet zpoždění spojů" value={formatDuration(network.sum_max_delay)} note={`Největší zpoždění každého z ${formatNumber(network.trips_total)} spojů, sečtené dohromady`} accent />
+        <Metric label="Průměr na jeden spoj" value={formatMinutes(perTrip)} note="Největší zpoždění spoje v průměru, včetně spojů bez zpoždění" />
+        <Metric label="Průměr zpožděného odjezdu" value={formatDuration(network.average_late_delay_s)} note={`Jen ${formatNumber(network.dep_late)} odjezdů se zpožděním 3 min a víc`} />
       </div>
     </section>
 
@@ -74,9 +124,15 @@ function Overview({ day, isToday, leaderboard, record }: {
       <div className="section-heading"><div><span className="section-kicker">Linky pod lupou</span><h2 id="rankings-title">Dnešní žebříčky</h2></div>
         <p>U průměrů a dochvilnosti zobrazujeme linky s alespoň 20 dokončenými spoji.</p></div>
       {leaderboard.data ? <div className="ranking-grid">
-        <Ranking title="Největší součet" subtitle="Zpoždění spojů na lince" items={leaderboard.data.most_total_delay} value={(item) => formatDuration(item.totals.sum_max_delay)} />
-        <Ranking title="Nejvíc na spoj" subtitle="Průměrné maximum spoje" items={leaderboard.data.highest_delay_per_trip} value={(item) => formatDuration(item.average_max_delay_s)} />
-        <Ranking title="Nejhorší dochvilnost" subtitle="Podíl odjezdů včas" items={leaderboard.data.worst_punctuality} value={(item) => formatPercent(item.totals.punctuality_pct)} />
+        <Ranking title="Nejvíc zpoždění celkem" subtitle="Sečtené největší zpoždění všech spojů linky. Linky s mnoha spoji mají přirozeně víc."
+          items={leaderboard.data.most_total_delay} value={(item) => formatDuration(item.totals.sum_max_delay)}
+          detail={(item) => `za ${formatNumber(item.totals.trips_total)} spojů`} />
+        <Ranking title="Nejvíc zpoždění na spoj" subtitle="Průměrné největší zpoždění jednoho spoje linky."
+          items={leaderboard.data.highest_delay_per_trip} value={(item) => formatMinutes(item.average_max_delay_s)}
+          detail={(item) => `průměr z ${formatNumber(item.totals.trips_total)} spojů`} />
+        <Ranking title="Nejhorší dochvilnost" subtitle="Podíl odjezdů ze zastávek, které byly včas."
+          items={leaderboard.data.worst_punctuality} value={(item) => formatPercent(item.totals.punctuality_pct)}
+          detail={(item) => `${formatNumber(item.totals.dep_on_time)} z ${formatNumber(item.totals.dep_total)} odjezdů`} />
       </div> : <div className="empty-panel">{leaderboard.failed ? "Žebříčky se nepodařilo načíst." : "Načítáme žebříčky…"}</div>}
     </section>
 
@@ -142,14 +198,11 @@ export function Dashboard() {
     </div></header>
 
     <div className="shell">
-      <section className="hero"><div className="hero-copy"><div className="hero-kicker"><span className="live-dot" /> PRAŽSKÁ INTEGROVANÁ DOPRAVA</div>
-        <h1>Jak moc dnes<br /><i>trčíme?</i></h1>
-        <p>Dochvilnost pražské dopravy podle skutečných odjezdů ze zastávek. Bez dojmů, s vysvětlením každého čísla.</p>
-      </div><div className="hero-side"><span>01 / Přehled sítě</span><strong>Data místo odhadů.</strong><small>Zdroj: Golemio · CC BY 4.0</small></div></section>
-
-      <div className="toolbar"><div><span className="section-kicker">Provozní den</span><label htmlFor="day-select" className="sr-only">Vyberte den</label>
-        <input id="day-select" type="date" value={date} max={today} onChange={(event) => event.target.value && setDate(event.target.value)} /></div>
-        <div className="toolbar-meta"><span>{date ? formatDate(date) : "Načítáme datum"}</span>{dataAsOf && <small>{dataAsOf}</small>}</div></div>
+      <div className="page-head"><div className="page-title"><span className="section-kicker">Pražská integrovaná doprava</span>
+        <h1>{!date || date === today ? <>Jak moc dnes <i>trčíme?</i></> : <>Jak moc jsme <i>trčeli?</i></>}</h1></div>
+        <div className="page-date"><label htmlFor="day-select" className="sr-only">Vyberte den</label>
+          <input id="day-select" type="date" value={date} max={today} onChange={(event) => event.target.value && setDate(event.target.value)} />
+          <small>{date ? formatDate(date) : "Načítáme datum"}{dataAsOf && ` · ${dataAsOf}`}</small></div></div>
 
       {demo && <div className="demo-notice"><strong>Ukázková data</strong><span>Tato čísla jsou vymyšlená pro návrh webu. Nejde o údaje PID.</span></div>}
       {!date || (!demo && dayQuery.isPending) ? <div className="state-panel">Načítáme přehled dne…</div> :
