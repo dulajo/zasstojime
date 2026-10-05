@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError, type Day, type Leaderboard, type RecordDay, type RouteRank } from "@/lib/api";
 import { demoData } from "@/lib/demo-data";
+import { SiteHeader } from "@/components/SiteHeader";
 import { formatDate, formatDuration, formatMinutes, formatNumber, formatPercent, formatTimestamp, isLiveDay, todayInPrague } from "@/lib/format";
 
 const categoryNames: Record<string, string> = {
@@ -66,7 +67,7 @@ function liveSentence(late: number, running: number): string {
   if (share >= 0.5) return "Právě teď má zpoždění víc než polovina spojů na trase.";
   const ordinal = ordinals[Math.round(1 / share)];
   return ordinal ? `Zhruba každý ${ordinal} spoj na trase má právě teď zpoždění.` :
-    "Spoje na trase, které mají právě teď zpoždění.";
+    "Zpoždění má právě teď jen málokterý spoj na trase.";
 }
 
 function Headline({ day, isToday }: { day: Day; isToday: boolean }) {
@@ -191,11 +192,7 @@ export function Dashboard() {
   const dataAsOf = day ? day.data_as_of ? `Data k ${formatTimestamp(day.data_as_of)}` : "Zatím bez úspěšného sběru" : "";
 
   return <main>
-    <header className="topbar"><div className="shell topbar-inner">
-      <a className="brand" href="/" aria-label="Zpožděno, úvodní stránka"><span className="brand-mark">Z.</span><span>Zpožděno<span className="brand-period">.</span></span></a>
-      <nav aria-label="Hlavní navigace"><a className="active" href="/">Přehled</a><a href="/metodika/">Metodika</a></nav>
-      <a className="demo-link" href={demo ? "/" : "/?demo=1"}>{demo ? "Živý přehled" : "Ukázka webu"}<span aria-hidden> ↗</span></a>
-    </div></header>
+    <SiteHeader active="overview" extra={<a className="demo-link" href={demo ? "/" : "/?demo=1"}>{demo ? "Živý přehled" : "Ukázka webu"}<span aria-hidden> ↗</span></a>} />
 
     <div className="shell">
       <div className="page-head"><div className="page-title"><span className="section-kicker">Pražská integrovaná doprava</span>

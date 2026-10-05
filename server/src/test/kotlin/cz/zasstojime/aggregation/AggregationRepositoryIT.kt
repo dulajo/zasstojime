@@ -1,12 +1,14 @@
 package cz.zasstojime.aggregation
 
 import cz.zasstojime.gtfs.Category
+import cz.zasstojime.gtfs.CzechCalendar
 import cz.zasstojime.ingest.IngestRepository
 import cz.zasstojime.ingest.IngestRun
 import cz.zasstojime.ingest.StopEvent
 import cz.zasstojime.ingest.TripKey
 import cz.zasstojime.ingest.TripState
 import cz.zasstojime.ingest.TripStatus
+import cz.zasstojime.time.PragueTime
 import io.quarkus.test.junit.QuarkusTest
 import jakarta.inject.Inject
 import org.jooq.DSLContext
@@ -104,5 +106,69 @@ class AggregationRepositoryIT {
                 HttpResponse.BodyHandlers.ofString())
             assertEquals(200, result.statusCode(), result.body())
         }
+
+        val tripResponse = http.send(HttpRequest.newBuilder(URI.create(
+            "http://localhost:8081/api/trip/$day/aggregation-fixture")).build(), HttpResponse.BodyHandlers.ofString())
+        assertEquals(200, tripResponse.statusCode(), tripResponse.body())
+        val tripBody = tripResponse.body()
+        assertTrue(tripBody.contains("\"line\":\"97\"") && tripBody.contains("\"mode\":\"tram\""), tripBody)
+        assertTrue(tripBody.contains("\"name\":\"Start\"") && tripBody.contains("\"name\":\"Cíl\""), tripBody)
+        assertTrue(tripBody.indexOf("\"sequence\":1") < tripBody.indexOf("\"sequence\":2"), tripBody)
+        assertTrue(tripBody.contains("\"departure_delay_s\":240"), tripBody)
+        assertEquals(404, http.send(HttpRequest.newBuilder(URI.create("http://localhost:8081/api/trip/$day/missing")).build(),
+            HttpResponse.BodyHandlers.ofString()).statusCode())
+
+        val holiday = http.send(HttpRequest.newBuilder(URI.create("http://localhost:8081/api/calendar/2026-10-28")).build(),
+            HttpResponse.BodyHandlers.ofString())
+        assertEquals(200, holiday.statusCode(), holiday.body())
+        assertTrue(holiday.body().contains("\"day_type\":\"sunday_holiday\""), holiday.body())
+        assertTrue(holiday.body().contains("\"holiday_name\":\""), holiday.body())
+        val saturday = http.send(HttpRequest.newBuilder(URI.create("http://localhost:8081/api/calendar/2026-10-03")).build(),
+            HttpResponse.BodyHandlers.ofString())
+        assertTrue(saturday.body().contains("\"day_type\":\"saturday\"") && saturday.body().contains("\"holiday_name\":null"),
+            saturday.body())
+
+        // Rozjetý spoj, který do cíle ještě nedojel, se vrátí bez příjezdu a neoznačí období jako neúplné.
+        val later = at.plusSeconds(900)
+        val running = TripState(TripKey(day, "aggregation-running"), "AGG", "97", Category.TRAM,
+            "Centrum", null, later, later, later).apply { status = TripStatus.RUNNING; depTotal = 1; depOnTime = 1 }
+        ingest.persistCycle(listOf(running), listOf(StopEvent(day, running.key.tripId, 1, running.routeId, "AGG-STOP", 98765,
+            later.minusSeconds(30), later, 60, 60)), IngestRun(later, later, true, 1, 1, 1))
+        val runningRoute = http.send(HttpRequest.newBuilder(URI.create(
+            "http://localhost:8081/api/my-route?line=97&from=98765&to=98766&time=07:20&day_type=workday&period=13m")).build(),
+            HttpResponse.BodyHandlers.ofString())
+        assertTrue(runningRoute.body().contains("\"trip_id\":\"aggregation-running\""), runningRoute.body())
+        assertTrue(runningRoute.body().contains("\"measured\":false") && runningRoute.body().contains("\"running\":true"),
+            runningRoute.body())
+        assertTrue(runningRoute.body().contains("\"measured_days\":0"), runningRoute.body())
+        assertTrue(runningRoute.headers().firstValue("Cache-Control").orElse("").contains("s-maxage=30"))
+
+        // Dojetý spoj bez změřeného cíle vrátí jen dotaz se směrem, bez něj by mohl jít opačným směrem.
+        val partialAt = at.plusSeconds(1800)
+        val partial = TripState(TripKey(day, "aggregation-partial"), "AGG", "97", Category.TRAM,
+            "Centrum", null, partialAt, partialAt, partialAt).apply { status = TripStatus.FINISHED; depTotal = 1; depOnTime = 1 }
+        ingest.persistCycle(listOf(partial), listOf(StopEvent(day, partial.key.tripId, 1, partial.routeId, "AGG-STOP", 98765,
+            partialAt, partialAt, 30, 30)), IngestRun(partialAt, partialAt, true, 1, 1, 1))
+        fun partialRoute(query: String) = http.send(HttpRequest.newBuilder(URI.create(
+            "http://localhost:8081/api/my-route?line=97&from=98765&to=98766&time=07:35&day_type=workday&period=13m$query")).build(),
+            HttpResponse.BodyHandlers.ofString()).body()
+        assertTrue(partialRoute("").contains("\"days\":[]"), partialRoute(""))
+        assertTrue(partialRoute("&headsign=Centrum").contains("\"trip_id\":\"aggregation-partial\""), partialRoute("&headsign=Centrum"))
+        assertTrue(partialRoute("&headsign=Jinam").contains("\"days\":[]"), partialRoute("&headsign=Jinam"))
+
+        // Nabídka časů hledá jen za posledních 13 dní, proto spoj z dneška.
+        val today = LocalDate.now(PragueTime.ZONE)
+        val dayType = CzechCalendar.dayType(today).db
+        val todayAt = today.atTime(7, 30).atZone(PragueTime.ZONE).toInstant()
+        val todayTrip = TripState(TripKey(today, "aggregation-today"), "AGG", "97", Category.TRAM,
+            "Centrum", null, todayAt, todayAt, todayAt).apply { status = TripStatus.FINISHED; depTotal = 1; depOnTime = 1 }
+        dsl.execute("INSERT INTO calendar_days(day, day_type) VALUES (?, ?) ON CONFLICT (day) DO NOTHING", today, dayType)
+        ingest.persistCycle(listOf(todayTrip), listOf(StopEvent(today, todayTrip.key.tripId, 1, todayTrip.routeId, "AGG-STOP",
+            98765, todayAt, todayAt, 0, 0)), IngestRun(todayAt, todayAt, true, 1, 1, 1))
+        fun departures(headsign: String) = http.send(HttpRequest.newBuilder(URI.create(
+            "http://localhost:8081/api/lines/97/departures?from=98765&day_type=$dayType&headsign=$headsign")).build(),
+            HttpResponse.BodyHandlers.ofString()).body()
+        assertTrue(departures("Centrum").contains("\"time\":\"07:30\""), departures("Centrum"))
+        assertTrue(departures("Jinam").contains("\"items\":[]"), departures("Jinam"))
     }
 }

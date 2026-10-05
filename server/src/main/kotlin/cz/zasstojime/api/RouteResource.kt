@@ -21,6 +21,7 @@ import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
 private const val ROUTE_CACHE = "public, s-maxage=300"
+private const val ROUTE_LIVE_CACHE = "public, s-maxage=30"
 private val DAY_TYPES = setOf("workday", "saturday", "sunday_holiday")
 
 @Serializable data class LineDto(@SerialName("route_id") val routeId: String, val line: String, val category: String)
@@ -78,11 +79,12 @@ class LinesResource(private val routes: RouteRepository, private val ingest: Ing
     @Path("{line}/departures")
     @APIResponse(responseCode = "200", content = [Content(schema = Schema(implementation = DepartureLookupResponse::class))])
     fun departures(@PathParam("line") line: String, @QueryParam("from") from: Int?,
-                   @QueryParam("day_type") dayType: String?): Response {
+                   @QueryParam("day_type") dayType: String?, @QueryParam("headsign") headsign: String?): Response {
         if (from == null || dayType !in DAY_TYPES) throw BadRequestException("Vyberte uzel a typ dne")
+        if (headsign != null && headsign.length > 100) throw BadRequestException("Směr je příliš dlouhý")
         val since = LocalDate.now(PragueTime.ZONE).minusDays(13)
         return routeCached(DepartureLookupResponse(Instant.now().toString(), ingest.lastSuccessAt?.toString(), false,
-            routes.departures(line, from, dayType!!, since).map { DepartureDto(it.time, it.observedDays) }))
+            routes.departures(line, from, dayType!!, since, headsign?.ifBlank { null }).map { DepartureDto(it.time, it.observedDays) }))
     }
 }
 
@@ -95,6 +97,8 @@ data class RouteDayDto(
     @SerialName("boarding_delay_s") val boardingDelayS: Int?,
     @SerialName("boarding_estimated") val boardingEstimated: Boolean,
     @SerialName("arrival_delay_s") val arrivalDelayS: Int?,
+    /** Spoj ještě jede a do cílové zastávky nedojel. */
+    val running: Boolean,
 )
 
 @Serializable
@@ -132,7 +136,8 @@ class MyRouteResource(private val routes: RouteRepository, private val ingest: I
     @APIResponse(responseCode = "200", content = [Content(schema = Schema(implementation = MyRouteResponse::class))])
     fun route(@QueryParam("line") line: String?, @QueryParam("from") from: Int?,
               @QueryParam("to") to: Int?, @QueryParam("time") time: String?,
-              @QueryParam("day_type") dayType: String?, @QueryParam("period") period: String?): Response {
+              @QueryParam("day_type") dayType: String?, @QueryParam("period") period: String?,
+              @QueryParam("headsign") headsign: String?): Response {
         if (line.isNullOrBlank() || line.length > 16 || from == null || to == null || from == to || dayType !in DAY_TYPES)
             throw BadRequestException("Vyberte linku, dvě různé stanice a typ dne")
         val localTime = try { LocalTime.parse(time, DateTimeFormatter.ofPattern("HH:mm")) }
@@ -146,7 +151,8 @@ class MyRouteResource(private val routes: RouteRepository, private val ingest: I
             "13m" -> today.minusMonths(13).plusDays(1)
             else -> throw BadRequestException("Období musí být 30d, 90d nebo 13m")
         }
-        val observations = routes.observations(line, from, to, timeText, dayType!!, since, today)
+        if (headsign != null && headsign.length > 100) throw BadRequestException("Směr je příliš dlouhý")
+        val observations = routes.observations(line, from, to, timeText, dayType!!, since, today, headsign?.ifBlank { null })
         val measured = observations.filter { it.boardingDelay != null && it.arrivalDelay != null }
         val count = measured.size
         fun average(value: (RouteObservation) -> Double): Double? =
@@ -162,13 +168,17 @@ class MyRouteResource(private val routes: RouteRepository, private val ingest: I
             totalCollectedDelayS = measured.sumOf { it.arrivalDelay!!.coerceAtLeast(0).toLong() },
         )
         val days = observations.map { RouteDayDto(it.date.toString(), it.tripId, it.plannedDeparture.toString(),
-            it.boardingDelay != null && it.arrivalDelay != null, it.boardingDelay, it.boardingEstimated, it.arrivalDelay) }
-        return routeCached(MyRouteResponse(line, from, to, timeText, dayType, selectedPeriod,
+            it.boardingDelay != null && it.arrivalDelay != null, it.boardingDelay, it.boardingEstimated, it.arrivalDelay,
+            it.running && it.arrivalDelay == null) }
+        // Rozjetý spoj se mění každý cyklus sběru.
+        return routeCached(cache = if (observations.any { it.running }) ROUTE_LIVE_CACHE else ROUTE_CACHE, entity = MyRouteResponse(line, from, to, timeText, dayType, selectedPeriod,
             Instant.now().toString(), ingest.lastSuccessAt?.toString(),
-            routes.incomplete(since, today, dayType) || observations.any { it.boardingDelay == null || it.arrivalDelay == null },
+            routes.incomplete(since, today, dayType) ||
+                observations.any { !it.running && (it.boardingDelay == null || it.arrivalDelay == null) },
             summary, days))
     }
 
 }
 
-private fun routeCached(entity: Any): Response = Response.ok(entity).header("Cache-Control", ROUTE_CACHE).build()
+private fun routeCached(entity: Any, cache: String = ROUTE_CACHE): Response =
+    Response.ok(entity).header("Cache-Control", cache).build()
