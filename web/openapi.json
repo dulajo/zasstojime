@@ -2,6 +2,28 @@
   "openapi": "3.1.0",
   "components": {
     "schemas": {
+      "CalendarDayResponse": {
+        "type": "object",
+        "required": [
+          "date",
+          "day_type",
+          "holiday_name"
+        ],
+        "properties": {
+          "date": {
+            "type": "string"
+          },
+          "day_type": {
+            "type": "string"
+          },
+          "holiday_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
       "DayResponse": {
         "type": "object",
         "required": [
@@ -465,7 +487,8 @@
           "measured",
           "boarding_delay_s",
           "boarding_estimated",
-          "arrival_delay_s"
+          "arrival_delay_s",
+          "running"
         ],
         "properties": {
           "date": {
@@ -496,6 +519,9 @@
               "null"
             ],
             "format": "int32"
+          },
+          "running": {
+            "type": "boolean"
           }
         }
       },
@@ -730,10 +756,180 @@
             "format": "double"
           }
         }
+      },
+      "TripResponse": {
+        "type": "object",
+        "required": [
+          "date",
+          "trip_id",
+          "line",
+          "category",
+          "mode",
+          "route_name",
+          "headsign",
+          "status",
+          "last_delay_s",
+          "last_seen_at",
+          "generated_at",
+          "data_as_of",
+          "incomplete",
+          "stops"
+        ],
+        "properties": {
+          "date": {
+            "type": "string"
+          },
+          "trip_id": {
+            "type": "string"
+          },
+          "line": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "route_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "headsign": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "last_delay_s": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "last_seen_at": {
+            "type": "string"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "data_as_of": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "incomplete": {
+            "type": "boolean"
+          },
+          "stops": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TripStopDto"
+            }
+          },
+          "source": {
+            "type": "string"
+          }
+        }
+      },
+      "TripStopDto": {
+        "type": "object",
+        "required": [
+          "sequence",
+          "stop_id",
+          "node_id",
+          "name",
+          "planned_arrival",
+          "planned_departure",
+          "arrival_delay_s",
+          "departure_delay_s"
+        ],
+        "properties": {
+          "sequence": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "stop_id": {
+            "type": "string"
+          },
+          "node_id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "planned_arrival": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "planned_departure": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "arrival_delay_s": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "departure_delay_s": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          }
+        }
       }
     }
   },
   "paths": {
+    "/api/calendar/{date}": {
+      "get": {
+        "parameters": [
+          {
+            "name": "date",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarDayResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Day",
+        "tags": [
+          "Calendar Resource"
+        ]
+      }
+    },
     "/api/day/{date}": {
       "get": {
         "parameters": [
@@ -949,6 +1145,17 @@
               "format": "int32"
             },
             "required": true
+          },
+          {
+            "name": "headsign",
+            "in": "query",
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "required": true
           }
         ],
         "responses": {
@@ -1026,6 +1233,17 @@
             "required": true
           },
           {
+            "name": "headsign",
+            "in": "query",
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "required": true
+          },
+          {
             "name": "line",
             "in": "query",
             "schema": {
@@ -1086,6 +1304,44 @@
         "summary": "Route",
         "tags": [
           "My Route Resource"
+        ]
+      }
+    },
+    "/api/trip/{date}/{tripId}": {
+      "get": {
+        "parameters": [
+          {
+            "name": "date",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tripId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Trip",
+        "tags": [
+          "Trip Resource"
         ]
       }
     }
