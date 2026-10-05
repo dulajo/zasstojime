@@ -17,6 +17,11 @@ const dayTypeNames: Record<string, string> = {
 };
 const noDirection = "__none__";
 
+function weekdayType(date: string): string {
+  const day = new Date(`${date}T12:00:00Z`).getUTCDay();
+  return day === 0 ? "sunday_holiday" : day === 6 ? "saturday" : "workday";
+}
+
 type Selection = { line: string; dir: string; from: number | null; to: number | null; date: string; time: string };
 
 const emptySelection: Selection = { line: "", dir: "", from: null, to: null, date: "", time: "" };
@@ -190,7 +195,8 @@ export function MyRoute() {
 
   const calendarQuery = useQuery({ queryKey: ["calendar", selection.date], queryFn: ({ signal }) => api.calendar(selection.date, signal),
     enabled: Boolean(selection.date), staleTime: Infinity });
-  const dayType = calendarQuery.data?.day_type;
+  // Bez odpovědi kalendáře (starší server, výpadek) určíme typ dne podle dne v týdnu; svátky pak nepoznáme.
+  const dayType = calendarQuery.data?.day_type ?? (calendarQuery.isError && selection.date ? weekdayType(selection.date) : undefined);
   const departuresQuery = useQuery({
     queryKey: ["departures", selection.line, selection.from, dayType, selection.dir],
     queryFn: ({ signal }) => api.departures(selection.line, selection.from!, dayType!,
@@ -239,7 +245,8 @@ export function MyRoute() {
               if (exact) chooseLine(exact.line);
             }} />
           {query && query !== selection.line && <div className="line-options" role="listbox" aria-label="Nalezené linky">
-            {linesQuery.isPending ? <span className="muted">Hledáme…</span> :
+            {linesQuery.isLoading ? <span className="muted">Hledáme…</span> :
+              linesQuery.isError ? <span className="muted">Linky se nepodařilo načíst.</span> :
               lineOptions.length === 0 ? <span className="muted">Linku jsme nenašli.</span> :
                 lineOptions.map((item) => <button key={item.line} type="button" role="option" aria-selected={false}
                   onClick={() => chooseLine(item.line)}><small>{lineKinds[item.category] ?? "Linka"}</small>{item.line}</button>)}
@@ -248,7 +255,8 @@ export function MyRoute() {
         <Field label="Směr" htmlFor="route-dir" area="dir">
           <select id="route-dir" value={selection.dir} disabled={directions.length === 0}
             onChange={(event) => update({ dir: event.target.value, from: null, to: null, time: "" })}>
-            <option value="" disabled>{selection.line ? stopsQuery.isPending ? "Načítáme…" : "Vyberte směr" : "Nejdřív linku"}</option>
+            <option value="" disabled>{selection.line ? stopsQuery.isLoading ? "Načítáme…" :
+              stopsQuery.isError ? "Zastávky se nepodařilo načíst" : "Vyberte směr" : "Nejdřív linku"}</option>
             {directions.map((dir) => <option key={dir} value={dir}>{dir === noDirection ? "Bez uvedeného směru" : `Směr ${dir}`}</option>)}
           </select>
         </Field>
@@ -266,14 +274,15 @@ export function MyRoute() {
             {toOptions.map((stop) => <option key={stop.node_id} value={stop.node_id}>{stop.name}</option>)}
           </select>
         </Field>
-        <Field label="Den" htmlFor="route-date" area="date" hint={dayType ? dayTypeNames[dayType] : undefined}>
+        <Field label="Den" htmlFor="route-date" area="date" hint={dayType ? `${dayTypeNames[dayType]}${calendarQuery.isError ? " (podle dne v týdnu)" : ""}` : undefined}>
           <input id="route-date" type="date" value={selection.date} min={today ? addDays(today, -29) : undefined} max={today}
             onChange={(event) => event.target.value && update({ date: event.target.value, time: "" })} />
         </Field>
         <Field label="Odjezd" htmlFor="route-time" area="time">
           <select id="route-time" value={times.includes(selection.time) ? selection.time : ""} disabled={times.length === 0}
             onChange={(event) => update({ time: event.target.value })}>
-            <option value="" disabled>{fromStop ? departuresQuery.isPending ? "Načítáme…" : "Žádné odjezdy" : "Nejdřív zastávku"}</option>
+            <option value="" disabled>{!fromStop ? "Nejdřív zastávku" : !dayType || departuresQuery.isLoading ? "Načítáme…" :
+              departuresQuery.isError ? "Odjezdy se nepodařilo načíst" : "Žádné odjezdy za 14 dní"}</option>
             {times.map((time) => <option key={time} value={time}>{time}</option>)}
           </select>
         </Field>
