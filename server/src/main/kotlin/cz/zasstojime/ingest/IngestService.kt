@@ -143,7 +143,7 @@ class IngestService(
             aggregation.flushDue(fetchTime)
             registry.counter("ingest_cycles_total", "result", "ok").increment()
             record(parsed, stats)
-            evictOldTrips()
+            evictOldTrips(fetchTime)
             updateGauges()
             true
         } catch (e: Exception) {
@@ -194,8 +194,9 @@ class IngestService(
     }
 
     /** Spoje provozních dnů starších než včera už nejedou (FR-14 drží dnešek a včerejšek). */
-    private fun evictOldTrips() {
-        val oldestKept = LocalDate.now(PragueTime.ZONE).minusDays(1)
+    /** Podle času snímku, ne hodin serveru: přehrání starého záznamu jinak spoje zahodí uprostřed jízdy. */
+    private fun evictOldTrips(fetchTime: Instant) {
+        val oldestKept = LocalDate.ofInstant(fetchTime, PragueTime.ZONE).minusDays(1)
         if (evictedUpTo == oldestKept) return
         val removed = processor.evictBefore(oldestKept)
         evictedUpTo = oldestKept
