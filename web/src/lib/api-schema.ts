@@ -4,44 +4,6 @@
  */
 
 export interface paths {
-    "/api/calendar/{date}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Day */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    date: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["CalendarDayResponse"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/day/{date}": {
         parameters: {
             query?: never;
@@ -238,216 +200,10 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/lines": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Lines */
-        get: {
-            parameters: {
-                query: {
-                    q: string | null;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["LineLookupResponse"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/lines/{line}/departures": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Departures */
-        get: {
-            parameters: {
-                query: {
-                    day_type: string | null;
-                    from: number | null;
-                    headsign: string | null;
-                };
-                header?: never;
-                path: {
-                    line: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["DepartureLookupResponse"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/lines/{line}/stops": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Stops */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    line: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["StopLookupResponse"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/my-route": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Route */
-        get: {
-            parameters: {
-                query: {
-                    day_type: string | null;
-                    from: number | null;
-                    headsign: string | null;
-                    line: string | null;
-                    period: string | null;
-                    time: string | null;
-                    to: number | null;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["MyRouteResponse"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/trip/{date}/{tripId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Trip */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    date: string;
-                    tripId: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["TripResponse"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        CalendarDayResponse: {
-            date: string;
-            day_type: string;
-            holiday_name: string | null;
-        };
         DayResponse: {
             date: string;
             generated_at: string;
@@ -461,18 +217,6 @@ export interface components {
             running_trips: number | null;
             /** Format: int32 */
             running_late_trips: number | null;
-            source?: string;
-        };
-        DepartureDto: {
-            time: string;
-            /** Format: int32 */
-            observed_days: number;
-        };
-        DepartureLookupResponse: {
-            generated_at: string;
-            data_as_of: string | null;
-            incomplete: boolean;
-            items: components["schemas"]["DepartureDto"][];
             source?: string;
         };
         HealthResponse: {
@@ -510,34 +254,6 @@ export interface components {
             worst_punctuality: components["schemas"]["RouteRankDto"][];
             source?: string;
         };
-        LineDto: {
-            route_id: string;
-            line: string;
-            category: string;
-        };
-        LineLookupResponse: {
-            generated_at: string;
-            data_as_of: string | null;
-            incomplete: boolean;
-            items: components["schemas"]["LineDto"][];
-            source?: string;
-        };
-        MyRouteResponse: {
-            line: string;
-            /** Format: int32 */
-            from: number;
-            /** Format: int32 */
-            to: number;
-            time: string;
-            day_type: string;
-            period: string;
-            generated_at: string;
-            data_as_of: string | null;
-            incomplete: boolean;
-            summary: components["schemas"]["RouteSummaryDto"];
-            days: components["schemas"]["RouteDayDto"][];
-            source?: string;
-        };
         RecordDto: {
             trip_id: string;
             line: string;
@@ -557,18 +273,6 @@ export interface components {
             record: components["schemas"]["RecordDto"] | null;
             source?: string;
         };
-        RouteDayDto: {
-            date: string;
-            trip_id: string;
-            planned_departure: string;
-            measured: boolean;
-            /** Format: int32 */
-            boarding_delay_s: number | null;
-            boarding_estimated: boolean;
-            /** Format: int32 */
-            arrival_delay_s: number | null;
-            running: boolean;
-        };
         RouteRankDto: {
             line: string;
             category: string;
@@ -578,39 +282,6 @@ export interface components {
             totals: components["schemas"]["TotalsDto"];
             /** Format: double */
             average_max_delay_s: number | null;
-        };
-        RouteSummaryDto: {
-            /** Format: int32 */
-            measured_days: number;
-            /** Format: int32 */
-            estimated_boarding_days: number;
-            /** Format: double */
-            on_time_boarding_pct: number | null;
-            /** Format: double */
-            average_extra_wait_s: number | null;
-            /** Format: double */
-            average_arrival_delay_s: number | null;
-            /** Format: int32 */
-            max_arrival_delay_s: number | null;
-            /** Format: double */
-            average_extra_ride_s: number | null;
-            /** Format: int64 */
-            total_collected_delay_s: number;
-        };
-        StopDto: {
-            /** Format: int32 */
-            node_id: number;
-            name: string;
-            headsign: string | null;
-            /** Format: int32 */
-            sequence: number;
-        };
-        StopLookupResponse: {
-            generated_at: string;
-            data_as_of: string | null;
-            incomplete: boolean;
-            items: components["schemas"]["StopDto"][];
-            source?: string;
         };
         TotalsDto: {
             /** Format: int32 */
@@ -635,38 +306,6 @@ export interface components {
             punctuality_pct: number | null;
             /** Format: double */
             average_late_delay_s: number | null;
-        };
-        TripResponse: {
-            date: string;
-            trip_id: string;
-            line: string;
-            category: string;
-            mode: string;
-            route_name: string | null;
-            headsign: string | null;
-            status: string;
-            /** Format: int32 */
-            last_delay_s: number | null;
-            last_seen_at: string;
-            generated_at: string;
-            data_as_of: string | null;
-            incomplete: boolean;
-            stops: components["schemas"]["TripStopDto"][];
-            source?: string;
-        };
-        TripStopDto: {
-            /** Format: int32 */
-            sequence: number;
-            stop_id: string;
-            /** Format: int32 */
-            node_id: number;
-            name: string | null;
-            planned_arrival: string | null;
-            planned_departure: string | null;
-            /** Format: int32 */
-            arrival_delay_s: number | null;
-            /** Format: int32 */
-            departure_delay_s: number | null;
         };
     };
     responses: never;

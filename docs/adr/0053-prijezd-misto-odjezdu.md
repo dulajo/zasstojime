@@ -1,6 +1,6 @@
 # ADR-0053: Chybějící odjezd v „Moje trasa“ nahradit příjezdem
 
-- **Stav:** Přijato
+- **Stav:** Nahrazeno ADR-0058
 - **Oblast:** Metodika
 - **Datum:** 2026-10-03
 
