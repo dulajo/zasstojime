@@ -1,16 +1,11 @@
-import type { ReactNode } from "react";
-
-const links = [
-  { href: "/", label: "Přehled", key: "overview" },
-  { href: "/metodika/", label: "Metodika", key: "method" },
-] as const;
-
-export function SiteHeader({ active, extra }: { active: (typeof links)[number]["key"]; extra?: ReactNode }) {
+export function SiteHeader() {
   return <header className="topbar"><div className="shell topbar-inner">
     <a className="brand" href="/" aria-label="Zpožděno, úvodní stránka"><span className="brand-mark">Z.</span><span>Zpožděno<span className="brand-period">.</span></span></a>
-    <nav aria-label="Hlavní navigace">{links.map((link) =>
-      <a key={link.key} className={link.key === active ? "active" : undefined} href={link.href}
-        aria-current={link.key === active ? "page" : undefined}>{link.label}</a>)}</nav>
-    {extra ?? <span className="topbar-spacer" aria-hidden />}
   </div></header>;
+}
+
+export function SiteFooter({ back = false }: { back?: boolean }) {
+  return <footer className="site-footer"><div><strong>Zpožděno.</strong><p>Neoficiální pohled na dochvilnost PID. Nejsme součástí PID ani DPP.</p></div>
+    <div><p>Zdroj dat: Golemio, licence CC BY 4.0.</p>
+      {back ? <a href="/">← Zpět na přehled</a> : <a href="/metodika/">Jak čísla počítáme →</a>}</div></footer>;
 }

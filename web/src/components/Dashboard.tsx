@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError, type Day, type Leaderboard, type RecordDay, type RouteRank } from "@/lib/api";
 import { demoData } from "@/lib/demo-data";
-import { SiteHeader } from "@/components/SiteHeader";
+import { SiteFooter, SiteHeader } from "@/components/SiteHeader";
 import { formatDate, formatDuration, formatMinutes, formatNumber, formatPercent, formatTimestamp, isLiveDay, todayInPrague } from "@/lib/format";
 
 const categoryNames: Record<string, string> = {
@@ -192,7 +192,7 @@ export function Dashboard() {
   const dataAsOf = day ? day.data_as_of ? `Data k ${formatTimestamp(day.data_as_of)}` : "Zatím bez úspěšného sběru" : "";
 
   return <main>
-    <SiteHeader active="overview" extra={<a className="demo-link" href={demo ? "/" : "/?demo=1"}>{demo ? "Živý přehled" : "Ukázka webu"}<span aria-hidden> ↗</span></a>} />
+    <SiteHeader />
 
     <div className="shell">
       <div className="page-head"><div className="page-title"><span className="section-kicker">Pražská integrovaná doprava</span>
@@ -205,12 +205,10 @@ export function Dashboard() {
       {!date || (!demo && dayQuery.isPending) ? <div className="state-panel">Načítáme přehled dne…</div> :
         day ? <Overview day={day} isToday={date === today} leaderboard={leaderboard} record={record} /> :
           <div className="state-panel"><span className="state-icon">∅</span><h2>{noData ? "Na tento den ještě nemáme data" : "Přehled se nepodařilo načíst"}</h2>
-            <p>{noData ? "Sběr historie začne po spuštění serveru. Mezitím si můžete prohlédnout podobu dashboardu s jasně označenými ukázkovými čísly." : "Zkuste stránku za chvíli obnovit. Dostupnost zdroje ověříme znovu."}</p>
-            {noData && <a className="button-link" href="/?demo=1">Zobrazit ukázku <span aria-hidden>↗</span></a>}
+            <p>{noData ? "Historie začíná dnem, kdy jsme spustili sběr. Zkuste vybrat jiný den." : "Zkuste stránku za chvíli obnovit. Dostupnost zdroje ověříme znovu."}</p>
           </div>}
 
-      <footer className="site-footer"><div><strong>Zpožděno.</strong><p>Neoficiální pohled na dochvilnost PID. Nejsme součástí PID ani DPP.</p></div>
-        <div><p>Zdroj dat: Golemio, licence CC BY 4.0.</p><a href="/metodika/">Jak čísla počítáme →</a></div></footer>
+      <SiteFooter />
     </div>
   </main>;
 }
