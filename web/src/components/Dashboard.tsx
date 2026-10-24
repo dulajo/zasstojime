@@ -60,14 +60,20 @@ type Loaded<T> = { data?: T; failed: boolean };
 const ordinals: Record<number, string> = { 2: "druhý", 3: "třetí", 4: "čtvrtý", 5: "pátý", 6: "šestý",
   7: "sedmý", 8: "osmý", 9: "devátý", 10: "desátý" };
 
-/** Lidská věta k podílu zpožděných spojů. Přesná čísla stojí vedle, věta je jen přibližná. */
-function liveSentence(late: number, running: number): string {
-  if (late === 0) return "Právě teď nemá zpoždění žádný spoj na trase.";
+/** Sloveso podle počtu: 1 spoj jede, 2–4 spoje jedou, 0 a 5+ spojů jede. */
+function lateSentence(late: number): string {
+  if (late === 1) return "spoj jede 3 min a víc pozdě";
+  if (late >= 2 && late <= 4) return "spoje jedou 3 min a víc pozdě";
+  return "spojů jede 3 min a víc pozdě";
+}
+
+/** Přibližný podíl slovy. Přesná čísla stojí vedle, tohle je jen pro představu. */
+function lateShare(late: number, running: number): string {
+  if (late === 0) return "";
   const share = late / running;
-  if (share >= 0.5) return "Právě teď má zpoždění víc než polovina spojů na trase.";
+  if (share >= 0.5) return ", víc než polovina";
   const ordinal = ordinals[Math.round(1 / share)];
-  return ordinal ? `Zhruba každý ${ordinal} spoj na trase má právě teď zpoždění.` :
-    "Zpoždění má právě teď jen málokterý spoj na trase.";
+  return ordinal ? `, zhruba každý ${ordinal}` : "";
 }
 
 function Headline({ day, isToday }: { day: Day; isToday: boolean }) {
@@ -77,9 +83,9 @@ function Headline({ day, isToday }: { day: Day; isToday: boolean }) {
   return <section aria-label="Hlavní čísla" className={`headline${live ? "" : " headline-single"}`}>
     {live && <div className="headline-live">
       <span className="headline-kicker"><span className="live-dot" /> Právě teď</span>
-      <strong className="headline-number">{formatPercent((late / running) * 100, 0)}</strong>
-      <p className="headline-sentence">{liveSentence(late, running)}</p>
-      <span className="headline-detail"><b>{formatNumber(late)}</b> z {formatNumber(running)} spojů na trase jede 3 min a víc pozdě</span>
+      <strong className="headline-number">{formatNumber(late)}</strong>
+      <p className="headline-sentence">{lateSentence(late)}</p>
+      <span className="headline-detail">z {formatNumber(running)} spojů, které jsou teď na trase{lateShare(late, running)}</span>
     </div>}
     <div className="headline-index">
       <span className="headline-kicker">Index dochvilnosti {isToday ? "dnes" : "za den"}</span>
