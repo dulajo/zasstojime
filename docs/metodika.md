@@ -124,26 +124,6 @@ Noční linka (`is_night`) a náhradní doprava (`is_substitute_transport`) jsou
 | `saturday` | Sobota, kromě státních svátků |
 | `sunday_holiday` | Neděle a státní svátky |
 
-## Moje trasa
-
-Na webu `/moje-trasa/`: linka, směr, nástupní a výstupní zastávka, den a čas odjezdu. Výsledek ukáže zpoždění
-na nástupu, v cíli a kolik spoj nabral cestou, průběh spoje po změřených zastávkách a stejný spoj v jiných dnech
-stejného typu. Zpoždění jednoho spoje se ukazuje v celých minutách useknutých dolů jako na odjezdových tabulích
-(179 s = „+2 min“, ještě včas).
-
-Uživatel zvolí **linku, stanici nástupu, stanici výstupu, plánovaný čas odjezdu a typ dne**. Spoj se v každém dni dohledá podle linky, uzlu nástupu a plánovaného času, ne podle `trip_id` (#47). Jen přímé spoje.
-
-| Metrika | Výpočet (za zvolené období) |
-|---|---|
-| Měřeno | Počet dní, kdy byl spoj změřen v nástupní i výstupní stanici |
-| Včas na nástupu | Počet dní s odjezdem v toleranci (−59 až +179 s) / měřeno. Když odjezd chybí, použije se příjezd a den se označí „odhad“ (ADR-0053) |
-| Průměrné čekání navíc | Průměr max(0, zpoždění odjezdu v A) |
-| Zpoždění v cíli | Průměr a maximum zpoždění příjezdu do B (když chybí, zpoždění odjezdu z B) |
-| Jízda navíc | Průměr (zpoždění v B − zpoždění v A) |
-| Celkem nasbíráno | Σ max(0, zpoždění v B) přes měřené dny |
-
-„Celkem nasbíráno“ se na webu uvádí jako „kdybys jel tímto spojem každý (pracovní) den“. Nevíme, kdy uživatel skutečně jel.
-
 ## Žebříčky
 
 | Žebříček | Výpočet | Podmínka |

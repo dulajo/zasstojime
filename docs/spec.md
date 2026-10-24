@@ -8,14 +8,14 @@
 ## 1. Účel a rozsah
 
 Server, který každých 30 s čte polohy vozidel PID z Golemia, měří zpoždění na odjezdech ze zastávek,
-ukládá je a poskytuje read-only API pro dashboard dochvilnosti a funkci „Moje trasa“.
+ukládá je a poskytuje read-only API pro dashboard dochvilnosti.
 
 | V rozsahu Fáze 1 | Mimo rozsah |
 |---|---|
 | Import PID GTFS (linky, zastávky) | Frontend (Fáze 2) |
 | Sběr a zpracování snímků, stavový automat spoje | Trasy s přestupy |
 | `trips_daily`, `stop_events`, denní a hodinové souhrny | Sociální sítě, přepočty na jednotky času |
-| Read-only API (dashboard, žebříčky, Moje trasa, health) | Uživatelské účty |
+| Read-only API (dashboard, žebříčky, health) | Uživatelské účty |
 | Monitoring, zálohy, nasazení do homelabu | Ověření metra (ADR-0013, čeká na mimořádnost) |
 
 ## 2. Pojmy
@@ -64,7 +64,7 @@ ukládá je a poskytuje read-only API pro dashboard dochvilnosti a funkci „Moj
 |---|---|---|
 | FR-30 | Endpointy dle [technicke.md – API](technicke.md#api). Každá odpověď obsahuje `generated_at`, `data_as_of`, `incomplete`. | 0017 |
 | FR-31 | Dashboardové endpointy vracejí předpočítaný JSON z paměti; `Cache-Control: public, s-maxage=30, stale-while-revalidate=60`. | 0017 |
-| FR-32 | `/api/my-route` počítá dle [metodika.md – Moje trasa](metodika.md#moje-trasa); výsledek obsahuje souhrn i seznam dní; `Cache-Control: public, s-maxage=300`. | 0047, 0048 |
+| FR-32 | Zrušeno: „Moje trasa“ není součástí webu. | 0058 |
 | FR-33 | `/api/health` vrací 503, pokud poslední úspěšný cyklus je starší než 10 min. | 0030 |
 | FR-34 | Server publikuje OpenAPI (`/q/openapi`). | 0024 |
 | FR-35 | API je read-only, bez autentizace; CORS jen pro doménu frontendu. | 0048 |
@@ -181,7 +181,7 @@ Upřesnění z implementace (`TripProcessor`):
 | `after_track` a pak znovu na trase | Znovuotevření do 15 min | 0042 |
 | Zrušení za jízdy | Změřené průjezdy zůstanou, spoj `canceled` | 0009 |
 | Linka nebo zastávka chybí v GTFS | Kategorie `other`; zastávka bez uzlu se neukládá; metrika + log | FR-02 |
-| Změna jízdního řádu (nová `trip_id`) | Nic zvláštního; Moje trasa hledá podle plánovaného času | 0047 |
+| Změna jízdního řádu (nová `trip_id`) | Nic zvláštního; spoj je klíčovaný provozním dnem a `trip_id` | 0003 |
 | Výpadek sběru > 30 min za den | `incomplete: true` v odpovědích za ten den | FR-30 |
 
 ## 6. Nefunkční požadavky
@@ -192,7 +192,7 @@ Upřesnění z implementace (`TripProcessor`):
 | NFR-02 | Stáří dat v API typicky ≤ 60 s. |
 | NFR-03 | Paměť serveru < 1 GB (cca 40 tis. spojů denně v paměti). |
 | NFR-04 | Růst DB ≤ ~2,5 GB/měsíc; retence dle [technicke.md](technicke.md#datový-model). |
-| NFR-05 | Odpověď API z paměti p95 < 50 ms; `/api/my-route` p95 < 500 ms nad 13 měsíci dat. |
+| NFR-05 | Odpověď API z paměti p95 < 50 ms. |
 | NFR-06 | API klíč jen v proměnné prostředí / `.env` mimo git; nikdy v logu. |
 | NFR-07 | Všechny časy uložené jako `TIMESTAMPTZ`; výpočty dnů a hodin v Europe/Prague. |
 | NFR-08 | Atribuce zdroje (Golemio, CC BY 4.0) v API (`source`) i na webu. |
@@ -210,7 +210,7 @@ Upřesnění z implementace (`TripProcessor`):
 | AC-10 | Test výběru vozidla: dvě vozidla na jednom spoji se sekvencemi 9 a 1 → použije se navazující. |
 | AC-04 | Testy `calendar_days`: všechny české svátky 2026–2027 včetně Velikonočního pondělí a Velkého pátku. |
 | AC-05 | Fixture: 30 min reálných snímků (xz, ~4 MB) v `src/test/resources`. Přehrání dá deterministický výsledek; počet průjezdů, index po kategoriích a top 5 zpoždění se ověří snapshot testem. |
-| AC-06 | Integrační test proti PostgreSQL (Dev Services): migrace, UPSERT, oddíly `stop_events`, dotaz Moje trasa na fixture. |
+| AC-06 | Integrační test proti PostgreSQL (Dev Services): migrace, UPSERT, oddíly `stop_events`, souhrny a API dashboardu na fixture. |
 | AC-07 | Po nasazení 1a: 24 h běhu bez pádu, `ingest_runs` úspěšnost ≥ 99 %, alert ověřen vypnutím sítě. |
 | AC-08 | Kontrola proti realitě: 3 ručně vybrané spoje porovnané s odjezdovou tabulí / aplikací PID Lítačka. |
 
@@ -223,7 +223,7 @@ Upřesnění z implementace (`TripProcessor`):
 | 1a-3 | Sběr + algoritmus + `trips_daily` / `stop_events` + `ingest_runs` | FR-10–14, AC-01–03, AC-05–06 |
 | 1a-4 | Metriky, `/api/health`, nasazení do homelabu (bez veřejného přístupu) | **AC-07 → od teď běží historie** |
 | 1b-1 | Souhrny a živé metriky | FR-20–23 |
-| 1b-2 | API dashboardu a Moje trasa, OpenAPI | FR-30–35, NFR-05 |
+| 1b-2 | API dashboardu, OpenAPI | FR-30–35, NFR-05 |
 | 1b-3 | Cloudflare Tunnel, zálohy, AC-08 | Veřejné API |
 
 ## 9. Rizika a otevřené otázky

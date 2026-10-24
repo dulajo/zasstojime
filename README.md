@@ -5,6 +5,13 @@ Srozumitelná a obhajitelná čísla: každé zveřejněné číslo jde vysvětl
 
 Zdroj dat: [Golemio](https://golemio.cz), licence CC BY 4.0. Projekt není oficiálním webem PID ani DPP.
 
+> **In English:** a public punctuality dashboard for Prague public transport (PID), built on open
+> real-time data from Golemio. A Kotlin/Quarkus service samples every vehicle position, tracks each
+> trip through a state machine and measures delay on every stop departure; a Next.js site shows the
+> daily punctuality index, line leaderboards and the delay record of the day. Every published number
+> is defined in the methodology ([`docs/metodika.md`](docs/metodika.md)) and every decision has its
+> own ADR ([`docs/adr/`](docs/adr/README.md)). Docs are in Czech.
+
 ## Dokumentace
 
 | Dokument | Obsah |
@@ -36,9 +43,9 @@ bez historie se zobrazí stav bez dat, `?demo=1` ukáže jasně označená ukáz
 | Fáze | Obsah | Stav |
 |---|---|---|
 | 0 – Ověření dat | API klíč, záznam dat, porovnání zdrojů, ověření metodiky | ✅ (zbývá ranní špička, metro) |
-| 1a – Sběr | GTFS import, sběr, stavový automat spoje, `stop_events`, monitoring, nasazení do homelabu **co nejdřív** (historie začíná spuštěním) | 🚧 nasazeno 2026-10-04 (CT 126), čeká na ověření AC-07 a AC-08 |
-| 1b – Výpočty a API | Agregace, žebříčky, „Moje trasa“, API | 🚧 implementováno; čeká na provozní ověření a ladění výkonu |
-| 2 – Web | Dashboard (metriky, kategorie, žebříčky, rekordman), **Moje trasa** (od ~1 měsíce dat), metodika, OG obrázky | 🚧 první dashboard a vysvětlení metodiky hotové, náhled v homelabu (`http://10.140.0.126/`), Moje trasa s dnešním spojem a průběhem po zastávkách; OG obrázky čekají |
+| 1a – Sběr | GTFS import, sběr, stavový automat spoje, `stop_events`, monitoring, nasazení do homelabu **co nejdřív** (historie začíná spuštěním) | 🚧 nasazeno 2026-10-04, čeká na ověření AC-07 a AC-08 |
+| 1b – Výpočty a API | Agregace, žebříčky, API | 🚧 implementováno; čeká na provozní ověření a ladění výkonu |
+| 2 – Web | Dashboard (metriky, kategorie, žebříčky, rekordman), metodika, OG obrázky | 🚧 první dashboard a vysvětlení metodiky hotové, náhled v homelabu; OG obrázky čekají |
 | 3 – Rozšíření | Grafy během dne, detail linky, historie | — |
 | Později | Přepočty zpoždění na srozumitelné jednotky času (na webu občas i pivní vtip, na sítích ne); příspěvky na sociální sítě se schvalováním a monetizace | — |
 
@@ -49,3 +56,8 @@ bez historie se zobrazí stav bez dat, `?demo=1` ukáže jasně označená ukáz
 | 1 | Jsou zpoždění metra reálná? (Fáze 0, #13) |
 | 2 | Výsledný název a doména |
 | 3 | Co ukazovat po půlnoci, kdy má nový den skoro nulová čísla |
+
+## Licence
+
+Kód: [MIT](LICENSE). Data: © Golemio / PID, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/);
+loga PID ani DPP projekt nepoužívá (ADR-0032).

@@ -46,5 +46,4 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8080 npm run build
 
 Build vytváří statický výstup v `out/`, připravený pro pozdější hosting na
 Cloudflare Pages. Veřejně zatím nasazený není, náhled běží v homelabu
-(docs/provoz.md, krok 5). Výběr „Moje trasa“ přijde po nasbírání historie a
-doplnění další části Fáze 2.
+(docs/provoz.md, krok 5).
