@@ -31,9 +31,10 @@
   --flag-text: #9b4c23;
 }
 
-/* Tmavý režim podle nastavení systému. Hlavní panel nahoře je tmavý v obou režimech. */
+/* Tmavý režim: podle systému, nebo ručně přepínačem (data-theme na <html>).
+   Hlavní panel nahoře je tmavý v obou režimech. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --ink: #e6eaee;
     --muted: #93a1ae;
     --paper: #0f1720;
@@ -61,6 +62,35 @@
     --flag-text: #f2b48a;
   }
 }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ink: #e6eaee;
+  --muted: #93a1ae;
+  --paper: #0f1720;
+  --surface: #172230;
+  --line: #263445;
+  --line-soft: #1f2c3b;
+  --line-strong: #34465a;
+  --teal: #3fa59c;
+  --subtle: #9fb0bf;
+  --faint: #6c7d8c;
+  --track: #24323f;
+  --accent-bg: #16342f;
+  --accent-border: #24504a;
+  --accent-text: #8cc7b5;
+  --soft-bg: #19282f;
+  --soft-text: #9fb4b4;
+  --rank-value: #8fc9cf;
+  --warn-bg: #3a2c12;
+  --warn-border: #6b5320;
+  --warn-text: #f1d9a6;
+  --alert-bg: #3a1f17;
+  --alert-border: #6e3727;
+  --alert-text: #f5c2b0;
+  --flag-bg: #3d2614;
+  --flag-text: #f2b48a;
+}
+:root[data-theme="light"] { color-scheme: light; }
 
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
@@ -213,4 +243,6 @@ a:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid 
   .method-grid { grid-template-columns: 1fr; }
 }
 
-
+.theme-toggle { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: transparent; color: var(--muted); cursor: pointer; }
+.theme-toggle:hover { color: var(--ink); border-color: var(--line-strong); }
+.theme-toggle svg { width: 16px; height: 16px; }

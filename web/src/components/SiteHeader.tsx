@@ -1,6 +1,9 @@
+import { ThemeToggle } from "@/components/ThemeToggle";
+
 export function SiteHeader() {
   return <header className="topbar"><div className="shell topbar-inner">
     <a className="brand" href="/" aria-label="Zpožděno, úvodní stránka"><span className="brand-mark">Z.</span><span>Zpožděno<span className="brand-period">.</span></span></a>
+    <ThemeToggle />
   </div></header>;
 }
 
