@@ -37,11 +37,11 @@ Každé rozhodnutí má vlastní soubor: kontext, rozhodnutí, alternativy, důs
 | [0041](0041-hodnota-odjezdu.md) | Zpoždění odjezdu = poslední hodnota před posunem na další zastávku | ✅ |
 | [0042](0042-znovuotevreni.md) | Dojetý spoj se může znovu otevřít | ✅ |
 | [0046](0046-typ-dne.md) | Typ dne s českými svátky | ✅ |
-| [0047](0047-moje-trasa.md) | Moje trasa: přímé spoje, hledání podle plánovaného času | ✅ |
+| [0047](0047-moje-trasa.md) | Moje trasa: přímé spoje, hledání podle plánovaného času | ⛔ Nahrazeno ADR-0058 |
 | [0050](0050-servisni-den-gtfs.md) | Provozní den = servisní den podle PID jízdního řádu | ✅ nahrazuje ADR-0004 |
 | [0051](0051-limit-poklesu.md) | Symetrický limit: zpoždění nesmí ani nereálně klesnout | ✅ |
 | [0052](0052-vic-vozidel-na-spoji.md) | Více vozidel na jednom spoji: vybrat to, které navazuje na průběh | ✅ |
-| [0053](0053-prijezd-misto-odjezdu.md) | Chybějící odjezd v „Moje trasa“ nahradit příjezdem | ✅ |
+| [0053](0053-prijezd-misto-odjezdu.md) | Chybějící odjezd v „Moje trasa“ nahradit příjezdem | ⛔ Nahrazeno ADR-0058 |
 | [0054](0054-odjezdy-zrusenych.md) | Odjezdy změřené před zrušením spoje se počítají | ✅ |
 | [0055](0055-rekordman-neovereno.md) | Rekordman nad 2 h má příznak „neověřeno“ | ✅ |
 
@@ -97,3 +97,4 @@ Každé rozhodnutí má vlastní soubor: kontext, rozhodnutí, alternativy, důs
 | ADR | Rozhodnutí | Stav |
 |---|---|---|
 | [0048](0048-bez-uctu.md) | Bez uživatelských účtů, trasa v URL | ✅ |
+| [0058](0058-bez-moje-trasy.md) | Bez „Moje trasa“, web jen o dochvilnosti sítě | ✅ nahrazuje ADR-0047, ADR-0053 |

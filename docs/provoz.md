@@ -5,9 +5,9 @@ Postup pro krok 1a-4 (spec, kapitola 8). Server běží ve stávající infrastr
 
 | Kde | Co |
 |---|---|
-| `zasstojime` (CT 126, `10.140.0.126`), neprivilegovaný LXC, Debian 13 | server jako systemd služba, Java 21, fast-jar; náhled webu za nginxem |
-| `postgres-db` (CT 124, `10.140.0.135`) | databáze `zasstojime` ve sdíleném PostgreSQL 17 (ADR-0057) |
-| `observability` (CT 119, `10.140.0.98`) | Prometheus stahuje `/q/metrics`, pravidla a dashboard v Grafaně, logy v Loki |
+| `zasstojime` (CT 126, `<APP_IP>`), neprivilegovaný LXC, Debian 13 | server jako systemd služba, Java 21, fast-jar; náhled webu za nginxem |
+| `postgres-db` (CT 124, `<DB_IP>`) | databáze `zasstojime` ve sdíleném PostgreSQL 17 (ADR-0057) |
+| `observability` (CT 119, `<OBS_IP>`) | Prometheus stahuje `/q/metrics`, pravidla a dashboard v Grafaně, logy v Loki |
 
 Historie dat začíná prvním úspěšným cyklem sběru, proto je nasazení prioritou. Nasazeno
 2026-10-04, první úspěšný cyklus 13:49 pražského času.
@@ -21,21 +21,21 @@ Skripty v [`deploy/`](../deploy) jsou idempotentní; opakované spuštění jen 
 | Šablona | `debian-13-standard_13.6-1_amd64.tar.zst`, neprivilegovaný, `nesting=1` |
 | CPU, RAM, swap | 2 jádra, 2 GB, 512 MB |
 | Disk | `local-lvm`, 8 GB (data jsou v CT 124) |
-| Síť | `vmbr0`, statická `10.140.0.126/24`, brána `10.140.0.1`, DNS `10.140.0.66` (AdGuard) |
+| Síť | `vmbr0`, statická `<APP_IP>/24`, brána `<GATEWAY_IP>`, DNS `<DNS_IP>` (AdGuard) |
 | Start | `onboot 1`, `startup order=4` (po `postgres-db`, stejně jako inbox-triage a Paperless) |
 | SSH | klíče z `/root/.ssh/authorized_keys` hosta (klíč Macu), root bez hesla |
 
 - Adresa musí být statická (potřebuje ji `pg_hba.conf` i Prometheus) a mimo DHCP rozsah UniFi.
 - Odchozí HTTPS na `api.golemio.cz` a `data.pid.cz`. Příchozí `8080` pro Prometheus
-  z `10.140.0.98`, `80` pro náhled webu (krok 5) a SSH.
+  z `<OBS_IP>`, `80` pro náhled webu (krok 5) a SSH.
 - **Nesting je povinný** (Debian 13 a journald, podrobně `inbox-triage/docs/deploy.md`).
 - Kartu v homelab repu (`INVENTAR.md`, `sit/`, `proxmox/`, `postgres-db/README.md`) doplnit o CT a IP.
 
-Na Proxmox hostu (`10.140.0.63`):
+Na Proxmox hostu (`<PROXMOX_IP>`):
 
 ```bash
 pct config 125 | grep net0                  # brána a maska jako u ostatních CT
-ping -c2 10.140.0.126                       # adresa musí být volná
+ping -c2 <APP_IP>                       # adresa musí být volná
 pveam update
 pveam available --section system | grep debian-13
 pveam download local debian-13-standard_13.6-1_amd64.tar.zst
@@ -45,8 +45,8 @@ pct create 126 local:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst \
   --unprivileged 1 --features nesting=1 \
   --cores 2 --memory 2048 --swap 512 \
   --rootfs local-lvm:8 \
-  --net0 name=eth0,bridge=vmbr0,ip=10.140.0.126/24,gw=10.140.0.1 \
-  --nameserver 10.140.0.66 \
+  --net0 name=eth0,bridge=vmbr0,ip=<APP_IP>/24,gw=<GATEWAY_IP> \
+  --nameserver <DNS_IP> \
   --timezone Europe/Prague \
   --onboot 1 --startup order=4 \
   --ssh-public-keys /root/.ssh/authorized_keys \
@@ -62,7 +62,7 @@ pct exec 126 -- bash -c 'systemctl is-active systemd-journald; ip -4 a show eth0
 V `postgres-db` jako root, se skriptem z repa `homelab`:
 
 ```bash
-DB_NAME=zasstojime ALLOWED_HOSTS="10.140.0.126/32" ./add-database.sh
+DB_NAME=zasstojime ALLOWED_HOSTS="<APP_IP>/32" ./add-database.sh
 grep -A3 'homelab:zasstojime' /etc/postgresql/17/main/pg_hba.conf
 ```
 
@@ -76,8 +76,8 @@ Zkopíruj do kontejneru `deploy/01-zasstojime.sh` **i** `deploy/zasstojime.env.e
 
 ```bash
 # vývojový stroj, kořen repozitáře
-scp deploy/01-zasstojime.sh deploy/zasstojime.env.example root@10.140.0.126:/root/
-ssh root@10.140.0.126 /root/01-zasstojime.sh
+scp deploy/01-zasstojime.sh deploy/zasstojime.env.example root@<APP_IP>:/root/
+ssh root@<APP_IP> /root/01-zasstojime.sh
 ```
 
 Skript nainstaluje Javu 21, založí uživatele `zasstojime` a `/opt/zasstojime/{bin,config}`,
@@ -91,19 +91,19 @@ Vyplň env soubor (`GOLEMIO_API_KEY` z [api.golemio.cz/api-keys](https://api.gol
 ```bash
 # kořen repozitáře; testy potřebují Docker
 JAVA_HOME=$(/usr/libexec/java_home -v 21) server/gradlew -p server clean build \
-  && rsync -avz --delete server/build/quarkus-app/ root@10.140.0.126:/opt/zasstojime/bin/
+  && rsync -avz --delete server/build/quarkus-app/ root@<APP_IP>:/opt/zasstojime/bin/
 ```
 
 Gradle 8.14 se pod JDK novějším než 24 nespustí (chyba jen s číslem verze, např.
 `What went wrong: 27`), proto `JAVA_HOME` na JDK 21. `gradlew` je v `server/`, ne v kořeni.
 
-Bez SSH do kontejneru přes Proxmox host (`10.140.0.63`) a `pct push`, stejně jako
+Bez SSH do kontejneru přes Proxmox host (`<PROXMOX_IP>`) a `pct push`, stejně jako
 u inbox-triage:
 
 ```bash
 # vývojový stroj (macOS)
 COPYFILE_DISABLE=1 tar czf /tmp/zasstojime-app.tgz -C server build/quarkus-app -C .. deploy
-scp /tmp/zasstojime-app.tgz root@10.140.0.63:/root/
+scp /tmp/zasstojime-app.tgz root@<PROXMOX_IP>:/root/
 # Proxmox host
 pct push 126 /root/zasstojime-app.tgz /root/zasstojime-app.tgz
 # aplikační LXC (pct enter 126)
@@ -128,7 +128,7 @@ curl -s localhost:8080/api/health    # {"status":"ok", ...}
 
 Do `scrape_configs` v `/etc/prometheus/prometheus.yml` přidej obsah
 [`deploy/observability/prometheus-scrape.yml`](../deploy/observability/prometheus-scrape.yml)
-(target `10.140.0.126:8080`):
+(target `<APP_IP>:8080`):
 
 ```bash
 promtool check config /etc/prometheus/prometheus.yml
@@ -139,7 +139,7 @@ Prometheus v CT 119 je z balíčku Debianu bez webového rozhraní (`/targets` v
 targetu ukáže API nebo v Grafaně dotaz `up{job="zasstojime"}` (má být 1):
 
 ```bash
-curl -s http://10.140.0.98:9090/api/v1/targets \
+curl -s http://<OBS_IP>:9090/api/v1/targets \
   | jq '.data.activeTargets[] | select(.labels.job=="zasstojime") | {health, lastError, scrapeUrl}'
 ```
 
@@ -158,8 +158,8 @@ s labely `job="zasstojime"`, `host`, `level`):
 
 ```bash
 # vývojový stroj
-scp deploy/observability/zasstojime-rules.yaml root@10.140.0.98:/etc/grafana/provisioning/alerting/
-ssh root@10.140.0.98 systemctl restart grafana-server
+scp deploy/observability/zasstojime-rules.yaml root@<OBS_IP>:/etc/grafana/provisioning/alerting/
+ssh root@<OBS_IP> systemctl restart grafana-server
 ```
 
 Výchozí notification policy posílá všechno na kontaktní bod `telegram`, směrování není potřeba.
@@ -182,18 +182,18 @@ a vyber zdroje Prometheus a Loki. Po změně znovu naimportovat (přepíše se p
 ## Krok 5: náhled webu (aplikační LXC)
 
 Veřejný web bude na Cloudflare (ADR-0027). Do té doby běží náhled v aplikačním LXC, dostupný
-z LAN a přes VPN na **http://10.140.0.126/**. nginx servíruje statický export z
+z LAN a přes VPN na **http://<APP_IP>/**. nginx servíruje statický export z
 `/var/www/zasstojime` a `/api/` přeposílá serveru na `127.0.0.1:8080`. Web a API jsou na jedné
 adrese, takže CORS není potřeba a web se sestaví s `NEXT_PUBLIC_API_BASE_URL=/` (relativní
 volání). Port `8080` zůstává pro Prometheus, `/q/metrics` přes nginx nejde.
 
 ```bash
 # vývojový stroj, kořen repozitáře (Node.js 20.9+)
-scp deploy/03-web.sh root@10.140.0.126:/root/
-ssh root@10.140.0.126 /root/03-web.sh        # nginx a konfigurace; bez webu vypíše, co nahrát
+scp deploy/03-web.sh root@<APP_IP>:/root/
+ssh root@<APP_IP> /root/03-web.sh        # nginx a konfigurace; bez webu vypíše, co nahrát
 (cd web && npm ci && NEXT_PUBLIC_API_BASE_URL=/ npm run build) \
-  && rsync -avz --delete web/out/ root@10.140.0.126:/var/www/zasstojime/
-ssh root@10.140.0.126 /root/03-web.sh        # srovná práva, ověří /, /metodika/ a /api/health
+  && rsync -avz --delete web/out/ root@<APP_IP>:/var/www/zasstojime/
+ssh root@<APP_IP> /root/03-web.sh        # srovná práva, ověří /, /metodika/ a /api/health
 ```
 
 První den (2026-10-04) má data až od 13:49, celý den je až ten následující.
@@ -283,16 +283,16 @@ do `docs/faze0.md` nebo do issue.
 ```bash
 # vývojový stroj, kořen repozitáře
 JAVA_HOME=$(/usr/libexec/java_home -v 21) server/gradlew -p server clean build \
-  && rsync -avz --delete server/build/quarkus-app/ root@10.140.0.126:/opt/zasstojime/bin/
-ssh root@10.140.0.126 /root/01-zasstojime.sh
+  && rsync -avz --delete server/build/quarkus-app/ root@<APP_IP>:/opt/zasstojime/bin/
+ssh root@<APP_IP> /root/01-zasstojime.sh
 ```
 
 Web (krok 5) se aktualizuje zvlášť, nezávisle na serveru:
 
 ```bash
 (cd web && npm ci && NEXT_PUBLIC_API_BASE_URL=/ npm run build) \
-  && rsync -avz --delete web/out/ root@10.140.0.126:/var/www/zasstojime/
-ssh root@10.140.0.126 /root/03-web.sh
+  && rsync -avz --delete web/out/ root@<APP_IP>:/var/www/zasstojime/
+ssh root@<APP_IP> /root/03-web.sh
 ```
 
 Restart historii nepřeruší: rozjeté spoje se obnoví z DB (FR-14), migrace běží při startu.

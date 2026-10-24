@@ -1,6 +1,6 @@
 # ADR-0047: Moje trasa: přímé spoje, hledání podle plánovaného času
 
-- **Stav:** Přijato
+- **Stav:** Nahrazeno ADR-0058
 - **Oblast:** Metodika
 - **Datum:** 2026-10-03
 

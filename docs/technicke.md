@@ -64,22 +64,7 @@ Všechny odpovědi obsahují `generated_at` a `data_as_of`. Cache: `public, s-ma
 | `GET /api/day/{date}/leaderboard` | Žebříčky; u linky i druh dopravy (`mode`: tram, bus, train, trolleybus, ferry, funicular) a trasa (`route_name`) |
 | `GET /api/day/{date}/record` | Rekordman dne |
 | `GET /api/day/{date}/hourly` | Hodinový vývoj |
-| `GET /api/lines?q=` | Vyhledání linky |
-| `GET /api/lines/{line}/stops` | Stanice linky (uzly) v pořadí trasy |
-| `GET /api/lines/{line}/departures?from={node}&day_type=&headsign=` | Plánované odjezdy ze stanice (z posledních 14 dní); `headsign` volitelně omezí směr |
-| `GET /api/my-route?line=&from=&to=&time=&day_type=&period=&headsign=` | „Moje trasa“: metriky + jednotlivé dny |
-| `GET /api/trip/{date}/{trip_id}` | Průběh spoje po změřených zastávkách (Moje trasa – detail) |
-| `GET /api/calendar/{date\|today}` | Typ dne a název svátku |
 | `GET /api/health` | Poslední úspěšný běh, stáří dat; 503 při datech starších než 10 min |
-
-`/api/my-route` přijímá `period=30d|90d|13m` (výchozí `30d`). Nabídka zastávek a odjezdů
-vychází ze skutečně zaznamenaných průjezdů v `stop_events`; bez historie sběru je prázdná.
-Odjezdy v nabídce se berou z posledních 14 dní.
-Spoj, který ještě jede a do cílové stanice nedojel, vrací `/api/my-route` s `running: true` a bez příjezdu.
-S `headsign` je směr jistý, a tak vrací i dojetý spoj, jehož cílovou stanici jsme nezachytili (`measured: false`);
-bez něj takový den vynechá, aby nezaměnil spoj opačného směru. Rozjetý spoj a `/api/trip` dneška mají
-`s-maxage=30`, uzavřené dny `s-maxage=300` (trip 3600 s). Indexy a odezvu nad 13 měsíci dat je třeba
-změřit po naplnění databáze.
 
 ## Konfigurace (proměnné prostředí)
 
@@ -108,7 +93,7 @@ server/
     ingest/                           TripProcessor (stavový automat, kap. 4 spec), cyklus sběru, zápis do DB
     persistence/                      jOOQ, oddíly stop_events, metrika velikosti DB
     aggregation/                      denní a hodinové souhrny, měsíční souhrn uzlů
-    api/                              /api/health, dashboard, linky a Moje trasa
+    api/                              /api/health a dashboard
   src/main/resources/db/migration/    Flyway
   src/test/resources/replay/          30 min reálných snímků + výřez GTFS (AC-05)
   tools/make_replay_fixture.py        tvorba fixture ze záznamu

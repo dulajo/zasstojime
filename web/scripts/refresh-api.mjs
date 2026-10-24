@@ -5,7 +5,7 @@ const url = process.env.API_OPENAPI_URL ?? "http://127.0.0.1:8080/q/openapi?form
 const response = await fetch(url);
 if (!response.ok) throw new Error(`OpenAPI request failed: HTTP ${response.status}`);
 const schema = await response.json();
-for (const name of ["DayResponse", "LeaderboardResponse", "RecordResponse", "MyRouteResponse"]) {
+for (const name of ["DayResponse", "LeaderboardResponse", "RecordResponse"]) {
   if (!schema.components?.schemas?.[name]?.properties) {
     throw new Error(`OpenAPI response schema is missing ${name}`);
   }

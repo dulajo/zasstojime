@@ -15,7 +15,7 @@
 #
 set -euo pipefail
 
-LOKI_URL="${LOKI_URL:-http://10.140.0.98:3100}"
+LOKI_URL="${LOKI_URL:?Nastav LOKI_URL, např. http://<OBS_IP>:3100}"
 LOG_JOB="${LOG_JOB:-zasstojime}"
 LOG_HOST="${LOG_HOST:-$(hostname -s)}"
 SERVICE_UNIT="${SERVICE_UNIT:-zasstojime.service}"

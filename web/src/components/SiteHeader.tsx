@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 
 const links = [
   { href: "/", label: "Přehled", key: "overview" },
-  { href: "/moje-trasa/", label: "Moje trasa", key: "my-route" },
   { href: "/metodika/", label: "Metodika", key: "method" },
 ] as const;
 
