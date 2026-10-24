@@ -76,16 +76,34 @@ function lateShare(late: number, running: number): string {
   return ordinal ? `, zhruba každý ${ordinal}` : "";
 }
 
+/** Součet zpoždění celého dne: od 10 hodin v celých hodinách, jinak s minutami. */
+function formatDayDelay(seconds: number): string {
+  const hours = seconds / 3600;
+  return hours >= 10 ? `${formatNumber(Math.round(hours))} h` : formatDuration(seconds);
+}
+
+/** 1 zrušený, 2–4 zrušené, 5+ zrušených. */
+function canceledText(canceled: number): string {
+  if (canceled === 0) return "";
+  const word = canceled === 1 ? "zrušený" : canceled <= 4 ? "zrušené" : "zrušených";
+  return `, z toho ${formatNumber(canceled)} ${word}`;
+}
+
 function Headline({ day, isToday }: { day: Day; isToday: boolean }) {
   const { running_trips: running, running_late_trips: late } = day;
   const network = day.network;
   const live = running != null && late != null && running > 0;
-  return <section aria-label="Hlavní čísla" className={`headline${live ? "" : " headline-single"}`}>
-    {live && <div className="headline-live">
+  return <section aria-label="Hlavní čísla" className="headline">
+    {live ? <div className="headline-live">
       <span className="headline-kicker"><span className="live-dot" /> Právě teď</span>
       <strong className="headline-number">{formatNumber(late)}</strong>
       <p className="headline-sentence">{lateSentence(late)}</p>
       <span className="headline-detail">z {formatNumber(running)} spojů, které jsou teď na trase{lateShare(late, running)}</span>
+    </div> : <div className="headline-live">
+      <span className="headline-kicker">Za celý den</span>
+      <strong className="headline-number">{formatDayDelay(network.sum_max_delay)}</strong>
+      <p className="headline-sentence">zpoždění nabraly spoje dohromady</p>
+      <span className="headline-detail">{formatNumber(network.trips_total)} spojů{canceledText(network.trips_canceled)}</span>
     </div>}
     <div className="headline-index">
       <span className="headline-kicker">Index dochvilnosti {isToday ? "dnes" : "za den"}</span>
@@ -128,7 +146,7 @@ function Overview({ day, isToday, leaderboard, record }: {
     </section>
 
     <section aria-labelledby="rankings-title" className="section-block">
-      <div className="section-heading"><div><span className="section-kicker">Linky pod lupou</span><h2 id="rankings-title">Dnešní žebříčky</h2></div>
+      <div className="section-heading"><div><span className="section-kicker">Linky pod lupou</span><h2 id="rankings-title">{isToday ? "Dnešní žebříčky" : "Žebříčky dne"}</h2></div>
         <p>U průměrů a dochvilnosti zobrazujeme linky s alespoň 20 dokončenými spoji.</p></div>
       {leaderboard.data ? <div className="ranking-grid">
         <Ranking title="Nejvíc zpoždění celkem" subtitle="Sečtené největší zpoždění všech spojů linky. Linky s mnoha spoji mají přirozeně víc."
@@ -195,7 +213,8 @@ export function Dashboard() {
   const record = sample ? { data: sample.record, failed: false } :
     { data: recordQuery.data, failed: recordQuery.isError };
   const noData = notFound(dayQuery.error);
-  const dataAsOf = day ? day.data_as_of ? `Data k ${formatTimestamp(day.data_as_of)}` : "Zatím bez úspěšného sběru" : "";
+  const dataAsOf = !day ? "" : !live ? "Uzavřený den" :
+    day.data_as_of ? `Data k ${formatTimestamp(day.data_as_of)}` : "Zatím bez úspěšného sběru";
 
   return <main>
     <SiteHeader />

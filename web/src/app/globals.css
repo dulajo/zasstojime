@@ -36,7 +36,6 @@ a:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid 
 .page-date small { color: var(--muted); font-size: 12px; text-align: right; }
 
 .headline { display: grid; grid-template-columns: 1.15fr 1fr; margin-top: 18px; border-radius: 22px; background: #16283b; color: #fff; overflow: hidden; }
-.headline-single { grid-template-columns: 1fr; }
 .headline > div { display: flex; flex-direction: column; padding: 38px 44px 36px; }
 .headline > div + div { border-left: 1px solid rgba(255,255,255,.14); }
 .headline-kicker { display: flex; align-items: center; gap: 10px; color: #c1d7d8; }
