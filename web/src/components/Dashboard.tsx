@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError, type Day, type Leaderboard, type RecordDay, type RouteRank } from "@/lib/api";
 import { demoData } from "@/lib/demo-data";
-import { SiteHeader } from "@/components/SiteHeader";
+import { SiteFooter, SiteHeader } from "@/components/SiteHeader";
 import { formatDate, formatDuration, formatMinutes, formatNumber, formatPercent, formatTimestamp, isLiveDay, todayInPrague } from "@/lib/format";
 
 const categoryNames: Record<string, string> = {
@@ -60,14 +60,20 @@ type Loaded<T> = { data?: T; failed: boolean };
 const ordinals: Record<number, string> = { 2: "druhý", 3: "třetí", 4: "čtvrtý", 5: "pátý", 6: "šestý",
   7: "sedmý", 8: "osmý", 9: "devátý", 10: "desátý" };
 
-/** Lidská věta k podílu zpožděných spojů. Přesná čísla stojí vedle, věta je jen přibližná. */
-function liveSentence(late: number, running: number): string {
-  if (late === 0) return "Právě teď nemá zpoždění žádný spoj na trase.";
+/** Sloveso podle počtu: 1 spoj jede, 2–4 spoje jedou, 0 a 5+ spojů jede. */
+function lateSentence(late: number): string {
+  if (late === 1) return "spoj jede 3 min a víc pozdě";
+  if (late >= 2 && late <= 4) return "spoje jedou 3 min a víc pozdě";
+  return "spojů jede 3 min a víc pozdě";
+}
+
+/** Přibližný podíl slovy. Přesná čísla stojí vedle, tohle je jen pro představu. */
+function lateShare(late: number, running: number): string {
+  if (late === 0) return "";
   const share = late / running;
-  if (share >= 0.5) return "Právě teď má zpoždění víc než polovina spojů na trase.";
+  if (share >= 0.5) return ", víc než polovina";
   const ordinal = ordinals[Math.round(1 / share)];
-  return ordinal ? `Zhruba každý ${ordinal} spoj na trase má právě teď zpoždění.` :
-    "Zpoždění má právě teď jen málokterý spoj na trase.";
+  return ordinal ? `, zhruba každý ${ordinal}` : "";
 }
 
 function Headline({ day, isToday }: { day: Day; isToday: boolean }) {
@@ -77,9 +83,9 @@ function Headline({ day, isToday }: { day: Day; isToday: boolean }) {
   return <section aria-label="Hlavní čísla" className={`headline${live ? "" : " headline-single"}`}>
     {live && <div className="headline-live">
       <span className="headline-kicker"><span className="live-dot" /> Právě teď</span>
-      <strong className="headline-number">{formatPercent((late / running) * 100, 0)}</strong>
-      <p className="headline-sentence">{liveSentence(late, running)}</p>
-      <span className="headline-detail"><b>{formatNumber(late)}</b> z {formatNumber(running)} spojů na trase jede 3 min a víc pozdě</span>
+      <strong className="headline-number">{formatNumber(late)}</strong>
+      <p className="headline-sentence">{lateSentence(late)}</p>
+      <span className="headline-detail">z {formatNumber(running)} spojů, které jsou teď na trase{lateShare(late, running)}</span>
     </div>}
     <div className="headline-index">
       <span className="headline-kicker">Index dochvilnosti {isToday ? "dnes" : "za den"}</span>
@@ -192,7 +198,7 @@ export function Dashboard() {
   const dataAsOf = day ? day.data_as_of ? `Data k ${formatTimestamp(day.data_as_of)}` : "Zatím bez úspěšného sběru" : "";
 
   return <main>
-    <SiteHeader active="overview" extra={<a className="demo-link" href={demo ? "/" : "/?demo=1"}>{demo ? "Živý přehled" : "Ukázka webu"}<span aria-hidden> ↗</span></a>} />
+    <SiteHeader />
 
     <div className="shell">
       <div className="page-head"><div className="page-title"><span className="section-kicker">Pražská integrovaná doprava</span>
@@ -205,12 +211,10 @@ export function Dashboard() {
       {!date || (!demo && dayQuery.isPending) ? <div className="state-panel">Načítáme přehled dne…</div> :
         day ? <Overview day={day} isToday={date === today} leaderboard={leaderboard} record={record} /> :
           <div className="state-panel"><span className="state-icon">∅</span><h2>{noData ? "Na tento den ještě nemáme data" : "Přehled se nepodařilo načíst"}</h2>
-            <p>{noData ? "Sběr historie začne po spuštění serveru. Mezitím si můžete prohlédnout podobu dashboardu s jasně označenými ukázkovými čísly." : "Zkuste stránku za chvíli obnovit. Dostupnost zdroje ověříme znovu."}</p>
-            {noData && <a className="button-link" href="/?demo=1">Zobrazit ukázku <span aria-hidden>↗</span></a>}
+            <p>{noData ? "Historie začíná dnem, kdy jsme spustili sběr. Zkuste vybrat jiný den." : "Zkuste stránku za chvíli obnovit. Dostupnost zdroje ověříme znovu."}</p>
           </div>}
 
-      <footer className="site-footer"><div><strong>Zpožděno.</strong><p>Neoficiální pohled na dochvilnost PID. Nejsme součástí PID ani DPP.</p></div>
-        <div><p>Zdroj dat: Golemio, licence CC BY 4.0.</p><a href="/metodika/">Jak čísla počítáme →</a></div></footer>
+      <SiteFooter />
     </div>
   </main>;
 }
